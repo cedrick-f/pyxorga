@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-##This file is part of pyXorg
+##This file is part of pyXorga
 #############################################################################
 #############################################################################
 ##                                                                         ##
@@ -50,7 +50,8 @@ import wx
 
 # sdk
 import xmind
-from xmind.core import workbook,saver
+from xmind.core import workbook,saver, loader
+from xmind.core.markerref import MarkerId, MarkerRefElement
 from xmind.core.topic import TopicElement
 from xmind import utils
 
@@ -64,12 +65,13 @@ import os
 import os.path 
 import glob
 import ConfigParser
+import shutil
 
 
 PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
 os.chdir(PATH)
-FICHIER_CFG = os.path.join(PATH, "pyXorg.cfg")
-
+FICHIER_CFG = os.path.join(PATH, "pyXorga.cfg")
+FICHIER_TYPES = os.path.join(PATH, "Types.cfg")
 
 FILE_ENCODING = sys.getfilesystemencoding()
 DEFAUT_ENCODING = "utf-8"
@@ -88,14 +90,20 @@ INCLURE_TYP = [u"Cours"]
 EXCLURE_TYP = [u"*"]
 
 
-SEPARATEUR = u" _ "
-#         nom              préfixe       marqueur   
-TYPES = { u"Cours"      : [u"C"     ,   "flag-blue"],
-          u"TD"         : [u"TD"    ,   "flag-green"],
-          u"Devoir"     : [u"DS"    ,   "flag-red"],
-          u"DevoirM"    : [u"DM"    ,   "flag-red"],
-          u"Test"       : [u"Test"  ,   "flag-red"],
-          u"QCM"        : [u"QCM"   ,   "flag-red"]}
+#SEPARATEUR = u" _ "
+##         nom              préfixe       marqueur   
+#TYPES = { u"Cours"      : [u"C"     ,   "flag-blue"],
+#          u"TD"         : [u"TD"    ,   "flag-green"],
+#          u"Devoir"     : [u"DS"    ,   "flag-red"],
+#          u"DevoirM"    : [u"DM"    ,   "flag-red"],
+#          u"Test"       : [u"Test"  ,   "flag-red"],
+#          u"QCM"        : [u"QCM"   ,   "flag-red"],
+#          u"TP"         : [u"TP"    ,   "flag-purple"],
+#          u"AP"         : [u"AP"    ,   "flag-yellow"],
+#          u"DT"         : [u"DT"    ,   "flag-orange"],
+#          u"FicheOutil"         : [u"FO"    ,   "star-blue"],
+#          u"FicheMethode"         : [u"FM"    ,   "star-purple"],
+#          }
 
 
 DOSSIER = u""
@@ -103,6 +111,12 @@ FICHIER = u""
 
 EXCLURE_DOSSIERS_VIDE = True
 STRUCTURE  = 'structure-class="org.xmind.ui.logic.right"'
+
+MARQUEUR_DOSSIER = "Dossier"
+#MarqueurIDDossier = MarkerId(MARQUEUR_DOSSIER)
+
+MarqueurDossier = MarkerRefElement()
+MarqueurDossier.setMarkerId(MARQUEUR_DOSSIER)
 
 ######################################################################################  
 def toDefautEncoding(path): 
@@ -239,23 +253,6 @@ class FilterNB(wx.Notebook):
 
         self.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.OnPageChanged)
         self.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGING, self.OnPageChanging)
-
-
-#    def getListeIE(self, IE, typ):
-#        if IE == "I":
-#            if typ == "F":
-#                return self.winExtensions.inclure
-#            elif typ == "D":
-#                return self.winDossiers.inclure
-#            elif typ == "T":
-#                return self.winTypes.inclure
-#        elif IE == "E":
-#            if typ == "F":
-#                return self.winExtensions.exclure
-#            elif typ == "D":
-#                return self.winDossiers.exclure
-#            elif typ == "T":
-#                return self.winTypes.exclure
             
             
     def OnPageChanged(self, event):
@@ -277,7 +274,7 @@ class FilterNB(wx.Notebook):
         
 class pyXorgFrame(wx.Frame):
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, "pyXorg", size = (400,400))
+        wx.Frame.__init__(self, None, -1, "pyXorga", size = (400,600))
         p = wx.Panel(self, -1, style = wx.TAB_TRAVERSAL
                      | wx.CLIP_CHILDREN
                      | wx.FULL_REPAINT_ON_RESIZE
@@ -288,7 +285,8 @@ class pyXorgFrame(wx.Frame):
         #
         self.nomFichier = FICHIER
         self.dossier =  DOSSIER
-        self.titreCarte = u"Classeur SSI"
+        self.dossierSortie = u""
+        self.titreCarte = u""
         
         self.exclure_Dir = EXCLURE_DIR
         self.inclure_Dir = INCLURE_DIR
@@ -299,30 +297,44 @@ class pyXorgFrame(wx.Frame):
         
         
         self.ouvrirCFG()
-        
+        self.ouvrirTypes()
+        print TYPES
+        print SEPARATEUR
         
         #
-        # Dossier
+        # Dossier à traiter
         #
-        box = wx.StaticBox(p, -1, u"Dossier")
+        box = wx.StaticBox(p, -1, u"Dossier à traiter")
         bsizerd = wx.StaticBoxSizer(box, wx.VERTICAL)
 
         c = URLSelectorCombo(p, self, self.dossier, "D")
         self.selecteur_D = c
         bsizerd.Add(c, 0, wx.ALL|wx.EXPAND, 5)
 
+
+        #
+        # Sorties
+        #
+        box = wx.StaticBox(p, -1, u"Structure de sortie")
+        bsizerxs = wx.StaticBoxSizer(box, wx.VERTICAL)
+        
+        st = wx.StaticText(p, -1, u"Nom de la racine")
+        ct = self.ctrlTitre = wx.TextCtrl(p, -1, self.titreCarte)
+        self.Bind(wx.EVT_TEXT, self.EvtText, ct)
+        
         #
         # Fichier Xmind de sortie
         #
-        box = wx.StaticBox(p, -1, u"Fichier de sortie")
+        box = wx.StaticBox(p, -1, u"Fichier XMind")
         bsizerx = wx.StaticBoxSizer(box, wx.HORIZONTAL)
 
         c = URLSelectorCombo(p, self, self.nomFichier, "F")
         bsizerx.Add(c, 1, wx.ALL|wx.EXPAND, 5)
         self.selecteur_F = c
         
-        b = wx.Button(p, -1, u"Générer", (20, 80)) 
+        b = self.boutonGenererXMind = wx.Button(p, -1, u"Générer\ncarte", (20, 80)) 
         self.Bind(wx.EVT_BUTTON, self.OnClick, b)
+        self.boutonGenererXMind.Enable(self.nomFichier != u"")
         b.SetToolTipString(u"Générer la carte mentale")
         bsizerx.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         
@@ -332,7 +344,28 @@ class pyXorgFrame(wx.Frame):
         b.SetToolTipString(u"Ouvrir la carte mentale")
         bsizerx.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         
+        #
+        # Dossier de sortie
+        #
+        box = wx.StaticBox(p, -1, u"Dossier de sortie")
+        bsizers = wx.StaticBoxSizer(box, wx.HORIZONTAL)
+
+        c = URLSelectorCombo(p, self, self.dossierSortie, "D")
+        self.selecteur_DS = c
+        bsizers.Add(c, 1, wx.ALL|wx.EXPAND, 5)
         
+        b = self.boutonGenererClone = wx.Button(p, -1, u"Générer\ndossier", (20, 80)) 
+        self.Bind(wx.EVT_BUTTON, self.OnClick, b)
+        self.boutonGenererClone.Enable(self.dossierSortie != u"")
+        b.SetToolTipString(u"Générer une copie du dossier")
+        bsizers.Add(b, 0, wx.ALL|wx.EXPAND, 5)
+        
+        
+        b = self.boutonOuvrirDossier = wx.BitmapButton(p, -1, wx.ArtProvider_GetBitmap(wx.ART_FOLDER, wx.ART_OTHER, (42, 42)))
+        self.boutonOuvrirDossier.Enable(os.path.exists(self.dossierSortie))
+        self.Bind(wx.EVT_BUTTON, self.OnClick, b)
+        b.SetToolTipString(u"Ouvrir le dossier généré")
+        bsizers.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         #
         # Filtres
         #
@@ -348,24 +381,65 @@ class pyXorgFrame(wx.Frame):
         #
         # Mise en place
         #
+        bsizerxs.Add(st, 0, wx.ALL|wx.EXPAND, 5)
+        bsizerxs.Add(self.ctrlTitre, 0, wx.ALL|wx.EXPAND, 5)
+        bsizerxs.Add(bsizerx, 0, wx.ALL|wx.EXPAND, 5)
+        bsizerxs.Add(bsizers, 0, wx.ALL|wx.EXPAND, 5)
+        bsizerxs.Add(bsizerf, 1, wx.ALL|wx.EXPAND, 5)
+        
         gbs = self.gbs = wx.GridBagSizer(5, 5)
         gbs.Add( bsizerd, (0,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
-        gbs.Add( bsizerx, (1,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
-        gbs.Add( bsizerf, (2,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
+        gbs.Add( bsizerxs, (1,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
+#        gbs.Add( bsizers, (2,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
+#        gbs.Add( bsizerf, (3,0), (1,1), wx.ALIGN_CENTER | wx.ALL | wx.EXPAND)
 
-        gbs.AddGrowableRow(2)
+        gbs.AddGrowableRow(1)
         gbs.AddGrowableCol(0)
 
         box = wx.BoxSizer()
         box.Add(gbs, 1, wx.ALL|wx.EXPAND, 5)
         p.SetSizerAndFit(box)
         
-        self.SetMinSize((400, 400))
+        self.SetMinSize((400, 600))
         self.SetClientSize(p.GetBestSize())
         
         # Interception de la demande de fermeture
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
+
+    ##########################################################################################
+    def EvtText(self, event):
+        self.titreCarte = event.GetString()
+        
+        
+    ##########################################################################################
+    def testerDossierExistant(self):
+        
+        os.chdir(self.dossierSortie)
+        d = os.path.join(self.dossierSortie, self.titreCarte)
+        while os.path.exists(d) and len(os.listdir(d)) > 0:
+            os.chdir(d)
+            dlg = wx.MessageDialog(self, u"Le dossier suivant existe déja, et n'est pas vide !\n\n\n" \
+                                         u"%s\n\n"\
+                                         u"Voulez-vous effacer son contenu ?\n" %os.path.join(self.dossierSortie, self.titreCarte),
+                                         u'Dossier existant et non vide',
+                                         wx.ICON_INFORMATION | wx.YES_NO | wx.CANCEL
+                                         )
+            retCode = dlg.ShowModal()
+            dlg.Destroy() 
+            if retCode == wx.ID_YES:
+                os.chdir(d)
+                for f in os.listdir(d):
+                    shutil.rmtree(f, ignore_errors = True)
+                os.chdir(d)
+            elif retCode == wx.ID_NO:
+                return False
+            else:
+                return False
+        
+        return True
+    
+    
     ##########################################################################################
     def OnClick(self, event):
         if event.GetEventObject() == self.boutonOuvrirXMind:
@@ -374,12 +448,29 @@ class pyXorgFrame(wx.Frame):
 #            subprocess.Popen(["xmind", self.nomFichier])
             except:
                 messageErreur(None, u"Ouverture impossible",
-                              u"Impossible d'accéder au dossier\n\n%s\n" %toDefautEncoding(self.nomFichier))
+                              u"Impossible d'accéder au fichier\n\n%s\n" %toDefautEncoding(self.nomFichier))
     
-        else:
+    
+    
+    
+
+        #####################################################################################################################
+        elif event.GetEventObject() == self.boutonOuvrirDossier:
+            try:
+                os.startfile(os.path.join(self.dossierSortie, self.titreCarte))
+#            subprocess.Popen(["xmind", self.nomFichier])
+            except:
+                messageErreur(None, u"Ouverture impossible",
+                              u"Impossible d'accéder au dossier\n\n%s\n" %toDefautEncoding(self.dossierSortie))
+    
+    
+    
+    
+        #####################################################################################################################
+        elif event.GetEventObject() == self.boutonGenererXMind:
             if os.path.exists(self.nomFichier):
                 dlg = wx.MessageDialog(self, u"La carte mentale %s existe déja !\n\n" \
-                                             u"Voulez-vous l'écraser ?\n",
+                                             u"Voulez-vous l'écraser ?\n" %self.nomFichier,
                                              u'Carte existante',
                                              wx.ICON_INFORMATION | wx.YES_NO | wx.CANCEL
                                              )
@@ -396,6 +487,8 @@ class pyXorgFrame(wx.Frame):
                 self.dossier = unicode(self.dossier, DEFAUT_ENCODING)
             except:
                 pass
+            
+            wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
             
             # Version sdk
             xm = xmind.load(self.nomFichier)
@@ -419,6 +512,9 @@ class pyXorgFrame(wx.Frame):
             
             # sdk
             xmind.save(xm, self.nomFichier) # and we save
+
+            wx.EndBusyCursor()
+            
             self.boutonOuvrirXMind.Enable(True)
             dlg = wx.MessageDialog(self, u"La carte mentale à été correctement générée\n\n" \
                                    u"Fichier :\n" + self.nomFichier, 
@@ -426,7 +522,42 @@ class pyXorgFrame(wx.Frame):
                            wx.OK | wx.ICON_INFORMATION)
             dlg.ShowModal()
             dlg.Destroy()
-        
+            
+
+
+            
+        #####################################################################################################################
+        elif event.GetEventObject() == self.boutonGenererClone:
+
+            try:
+                self.dossierSortie = unicode(self.dossierSortie, DEFAUT_ENCODING)
+            except:
+                pass
+            
+            try:
+                self.dossier = unicode(self.dossier, DEFAUT_ENCODING)
+            except:
+                pass
+            
+            if self.testerDossierExistant():
+                wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
+                os.chdir(self.dossierSortie)
+                if not os.path.exists(self.titreCarte):
+                    os.mkdir(self.titreCarte)
+                os.chdir(self.titreCarte)
+                self.genererDossier(self.dossier, os.getcwd())
+                
+                wx.EndBusyCursor()
+                
+                dlg = wx.MessageDialog(self, u"Le dossier a été correctement généré\n\n" \
+                                       u"Dossier :\n" + os.path.join(self.dossierSortie, self.titreCarte), 
+                                       u"Génération terminée",
+                               wx.OK | wx.ICON_INFORMATION)
+                dlg.ShowModal()
+                dlg.Destroy()
+            
+
+            
     ##########################################################################################
     def getListNomGlob(self, path, liste):
         os.chdir(path)
@@ -436,7 +567,7 @@ class pyXorgFrame(wx.Frame):
             l.extend(glob.glob(f))
 #        l = [f.encode(FILE_ENCODING) for f in l]
         return l
-    
+
     
     
     ##########################################################################################
@@ -454,7 +585,8 @@ class pyXorgFrame(wx.Frame):
 
         dirs = os.listdir(path)
         
-        for file in dirs:  
+        for file in dirs:
+            
             path_file = os.path.join(path, file)
             
             if os.path.isdir(path_file):
@@ -503,7 +635,50 @@ class pyXorgFrame(wx.Frame):
         return vide
 
 
+    ##########################################################################################
+    def genererDossier(self, path, sortie):
+        vide = True
+        try:
+            sortie = unicode(sortie, DEFAUT_ENCODING)
+        except:
+            pass
+        
+        if not os.path.exists(path) or len(path) > 255:
+            return
+        
+        dirs = os.listdir(path)
 
+        for file in dirs:  
+            path_file = os.path.join(path, file)
+
+            if os.path.isdir(path_file):
+                inclureD = self.getListNomGlob(path, self.inclure_Dir)
+                exclureD = self.getListNomGlob(path, self.exclure_Dir)
+                if not file in exclureD and file in inclureD:
+                    if len(os.listdir(path))>0:
+                        os.chdir(sortie)
+                        os.mkdir(file)
+                        dv = self.genererDossier(path_file, os.path.join(sortie, file))
+                        
+                        if EXCLURE_DOSSIERS_VIDE and not dv:
+                            vide = False
+                        else:
+                            os.chdir(sortie)
+                            os.rmdir(file)
+                        
+                        
+            else:
+                ext = os.path.splitext(file)[1]
+                typ, nom = GetTypeNom(file)
+                inclureF = self.getListNomGlob(path, self.inclure_Fic)
+                exclureF = self.getListNomGlob(path, self.exclure_Fic)
+                if not file in exclureF and file in inclureF and typ in self.inclure_Typ:
+                    shutil.copy2(os.path.join(path, file), sortie)
+
+                    vide = False
+        return vide
+    
+    
     #############################################################################
     def OnPathModified(self, selecteur, lien):
         if selecteur == self.selecteur_F:
@@ -512,8 +687,12 @@ class pyXorgFrame(wx.Frame):
 
         elif   selecteur == self.selecteur_D:
             self.dossier = lien
-
-        return
+            self.ctrlTitre.SetValue(os.path.basename(self.dossier))
+            self.boutonGenererXMind.Enable(self.nomFichier != u"")
+        
+        elif   selecteur == self.selecteur_DS:
+            self.dossierSortie = lien
+            self.boutonGenererClone.Enable(self.dossierSortie != u"")
     
     #############################################################################
     def MiseAJourFiltres(self, inc, exc, typ = "D"):
@@ -541,8 +720,10 @@ class pyXorgFrame(wx.Frame):
             return
         config = ConfigParser.ConfigParser()
         config.read(FICHIER_CFG)
-        self.dossier = config.get(SECTION_FICH, "Dossier")
-        self.nomFichier = config.get(SECTION_FICH, "Fichier")
+        self.dossier = config.get(SECTION_FICH, "Dossier", u"")
+        self.dossierSortie = config.get(SECTION_FICH, "DossierSortie", u"")
+        self.nomFichier = config.get(SECTION_FICH, "Fichier", u"")
+        self.titreCarte = config.get(SECTION_FICH, "Titre", u"")
         
         self.exclure_Dir = config.get(SECTION_FILTRE, "Exclure_Dir").split("\t")
         self.inclure_Dir = config.get(SECTION_FILTRE, "Inclure_Dir").split("\t")
@@ -551,7 +732,32 @@ class pyXorgFrame(wx.Frame):
         self.exclure_Typ = config.get(SECTION_FILTRE, "Exclure_Typ").split("\t")
         self.inclure_Typ = config.get(SECTION_FILTRE, "Inclure_Typ").split("\t")
        
-       
+    #############################################################################
+    def ouvrirTypes(self):
+        global SEPARATEUR, TYPES
+        
+        if not os.path.isfile(FICHIER_TYPES):
+            return
+        
+        config = ConfigParser.ConfigParser()
+        
+        config.read(FICHIER_TYPES)
+        SEPARATEUR = config.get("Format", "Separateur", u"")[1:-1]
+        TYPES = {}
+        
+        i = 1
+        continuer = True
+        while continuer:
+            try :
+                t = config.get("Types", "T"+str(i))
+                print t
+                n, p, f = t.split("#")
+                TYPES[n] = [p, f]
+                i += 1
+            except:
+                continuer = False
+#            if i == 100:
+#                continuer = False
         
     #############################################################################
     def enregistrerCFG(self):
@@ -561,7 +767,8 @@ class pyXorgFrame(wx.Frame):
         config.add_section(SECTION_FICH)
         config.set(SECTION_FICH, "Dossier", self.dossier)
         config.set(SECTION_FICH, "Fichier", self.nomFichier)
-        
+        config.set(SECTION_FICH, "DossierSortie", self.dossierSortie)
+        config.set(SECTION_FICH, "Titre", self.titreCarte)
     
         config.add_section(SECTION_FILTRE)
         config.set(SECTION_FILTRE, "Exclure_Dir", "\t".join(self.exclure_Dir))
