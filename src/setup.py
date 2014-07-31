@@ -58,7 +58,7 @@ cible = Executable(
 
 
 setup(  name = "pyXorga",
-        version = "1.0",
+        version = "1.3",
         author = "Cedrick FAURY",
         description = u"pyXorga",
         options = {"build_exe": build_exe_options},

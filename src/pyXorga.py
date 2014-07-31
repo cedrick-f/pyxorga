@@ -37,7 +37,7 @@ Copyright (C) 2014
 """
 __appname__= "pyXorga"
 __author__ = u"Cédrick FAURY"
-__version__ = "1.0"
+__version__ = "1.3"
 
 
 ####################################################################################
@@ -66,6 +66,7 @@ import os.path
 import glob
 import ConfigParser
 import shutil
+import codecs
 
 
 PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -146,8 +147,8 @@ def GetTypeNom(nFich):
     """
     parties = nFich.split(SEPARATEUR)
     if len(parties) > 1:
-        for t, l in TYPES.items():
-            if parties[0] == l[0]:
+        for t in TYPES.keys():
+            if parties[0] == t:
                 return t, parties[1]
     return None, nFich
 
@@ -209,6 +210,12 @@ SECTION_FILTRE = u"Filtres"
 #    def OnInit(self):
 #        wx.Log.SetLogLevel(0) # ?? Pour éviter le plantage de wxpython 3.0 avec Win XP pro ???
 #        
+def fcount(path):
+    count1 = 0
+    for root, dirs, files in os.walk(path):
+            count1 += len(dirs)
+
+    return count1
 
 
 
@@ -246,7 +253,7 @@ class FilterNB(wx.Notebook):
 #        self.exclure_F = winExtensions.exclure
 #        self.inclure_F = winExtensions.inclure
         
-        self.winTypes = PanelInclureExclure(self, app, "T", inclure_Typ, exclure_Typ)
+        self.winTypes = PanelInclureExclureTypes(self, app, inclure_Typ, exclure_Typ)
         self.AddPage(self.winTypes, u"Types")
 #        self.exclure_T = winTypes.exclure
 #        self.inclure_T = winTypes.inclure
@@ -285,6 +292,7 @@ class pyXorgFrame(wx.Frame):
         #
         self.nomFichier = FICHIER
         self.dossier =  DOSSIER
+        self.ajouterCarteMentale = True
         self.dossierSortie = u""
         self.titreCarte = u""
         
@@ -298,8 +306,7 @@ class pyXorgFrame(wx.Frame):
         
         self.ouvrirCFG()
         self.ouvrirTypes()
-        print TYPES
-        print SEPARATEUR
+
         
         #
         # Dossier à traiter
@@ -335,13 +342,13 @@ class pyXorgFrame(wx.Frame):
         b = self.boutonGenererXMind = wx.Button(p, -1, u"Générer\ncarte", (20, 80)) 
         self.Bind(wx.EVT_BUTTON, self.OnClick, b)
         self.boutonGenererXMind.Enable(self.nomFichier != u"")
-        b.SetToolTipString(u"Générer la carte mentale")
+        b.SetToolTipString(u"Générer une carte mentale XMind de la structure")
         bsizerx.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         
         b = self.boutonOuvrirXMind = wx.BitmapButton(p, -1, Images.LogoXMind.GetBitmap())
         self.boutonOuvrirXMind.Enable(os.path.exists(self.nomFichier))
         self.Bind(wx.EVT_BUTTON, self.OnClick, b)
-        b.SetToolTipString(u"Ouvrir la carte mentale")
+        b.SetToolTipString(u"Ouvrir la carte mentale générée (XMind nécessaire)")
         bsizerx.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         
         #
@@ -350,14 +357,22 @@ class pyXorgFrame(wx.Frame):
         box = wx.StaticBox(p, -1, u"Dossier de sortie")
         bsizers = wx.StaticBoxSizer(box, wx.HORIZONTAL)
 
+        vs = wx.BoxSizer(wx.VERTICAL)
         c = URLSelectorCombo(p, self, self.dossierSortie, "D")
         self.selecteur_DS = c
-        bsizers.Add(c, 1, wx.ALL|wx.EXPAND, 5)
+        vs.Add(c, 1, wx.ALL|wx.EXPAND, 2)
+        
+        cb = wx.CheckBox(p, -1, u"Carte mentale")
+        cb.SetValue(self.ajouterCarteMentale)
+        self.Bind(wx.EVT_CHECKBOX, self.EvtCheckBox, cb)
+        cb.SetToolTipString(u"Générer une carte mentale à la racine du dossier")
+        vs.Add(cb, 1, wx.ALL|wx.EXPAND, 2)
+        bsizers.Add(vs, 1, wx.ALL|wx.EXPAND, 5)
         
         b = self.boutonGenererClone = wx.Button(p, -1, u"Générer\ndossier", (20, 80)) 
         self.Bind(wx.EVT_BUTTON, self.OnClick, b)
         self.boutonGenererClone.Enable(self.dossierSortie != u"")
-        b.SetToolTipString(u"Générer une copie du dossier")
+        b.SetToolTipString(u"Générer une arborescence de fichiers de la structure")
         bsizers.Add(b, 0, wx.ALL|wx.EXPAND, 5)
         
         
@@ -366,6 +381,8 @@ class pyXorgFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnClick, b)
         b.SetToolTipString(u"Ouvrir le dossier généré")
         bsizers.Add(b, 0, wx.ALL|wx.EXPAND, 5)
+        
+        
         #
         # Filtres
         #
@@ -410,6 +427,11 @@ class pyXorgFrame(wx.Frame):
     ##########################################################################################
     def EvtText(self, event):
         self.titreCarte = event.GetString()
+        
+        
+    ##########################################################################################
+    def EvtCheckBox(self, event):
+        self.ajouterCarteMentale = event.IsChecked()
         
         
     ##########################################################################################
@@ -468,6 +490,10 @@ class pyXorgFrame(wx.Frame):
     
         #####################################################################################################################
         elif event.GetEventObject() == self.boutonGenererXMind:
+            
+            if os.path.splitext(self.nomFichier)[1].lower() != ".xmind":
+                self.nomFichier = os.path.splitext(self.nomFichier)[0] + ".xmind"
+                
             if os.path.exists(self.nomFichier):
                 dlg = wx.MessageDialog(self, u"La carte mentale %s existe déja !\n\n" \
                                              u"Voulez-vous l'écraser ?\n" %self.nomFichier,
@@ -490,38 +516,29 @@ class pyXorgFrame(wx.Frame):
             
             wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
             
-            # Version sdk
-            xm = xmind.load(self.nomFichier)
-            first_sheet=xm.getPrimarySheet() # get the first sheet
-            first_sheet.setTitle(self.titreCarte) # set its title
-            root_topic=first_sheet.getRootTopic() # get the root topic of this sheet
-            root_topic.setTitle(self.titreCarte) # set its title
-            root_topic.setAttribute("structure-class", "org.xmind.ui.logic.right")
-            # Version mekk
-    #        xmind = XMindDocument.create(self.titreCarte, self.titreCarte)
-    #        first_sheet = xmind.get_first_sheet()
-    #        root_topic = first_sheet.get_root_topic()
-    
-            self.genererCarte(self.dossier, root_topic)
-            
-            if os.path.splitext(self.nomFichier)[1] != ".xmind":
-                self.nomFichier = os.path.splitext(self.nomFichier)[0] + ".xmind"
-            
-            # mekk
-    #        xmind.save(self.nomFichier)
-            
-            # sdk
-            xmind.save(xm, self.nomFichier) # and we save
+            nDossiers = fcount(self.dossier)
+            self.dlg =    ProgressDialog(None, -1, u"Génération de la carte", nDossiers)
 
+#            self.count = 0
+
+            self.dlg.SetMessage(u"Génération de la carte mentale ...\n\n")
+            self.dlg.Show()
+            
+            self.creerCarte(self.nomFichier, self.titreCarte, self.dossier)
+            
             wx.EndBusyCursor()
             
+            self.dlg.SetMessage(u"La carte mentale à été correctement générée\n\n" \
+                                       u"Fichier :\n" + self.nomFichier)
+            self.dlg.Destroy()
+            
             self.boutonOuvrirXMind.Enable(True)
-            dlg = wx.MessageDialog(self, u"La carte mentale à été correctement générée\n\n" \
-                                   u"Fichier :\n" + self.nomFichier, 
-                                   u"Génération terminée",
-                           wx.OK | wx.ICON_INFORMATION)
-            dlg.ShowModal()
-            dlg.Destroy()
+#            dlg = wx.MessageDialog(self, u"La carte mentale à été correctement générée\n\n" \
+#                                   u"Fichier :\n" + self.nomFichier, 
+#                                   u"Génération terminée",
+#                           wx.OK | wx.ICON_INFORMATION)
+#            dlg.ShowModal()
+#            dlg.Destroy()
             
 
 
@@ -541,14 +558,29 @@ class pyXorgFrame(wx.Frame):
             
             if self.testerDossierExistant():
                 wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
+                
+                nDossiers = fcount(self.dossier)
+                self.dlg =    ProgressDialog(None, -1, u"Génération du dossier clone", nDossiers)
+                self.dlg.SetMessage(u"Génération du dossier clone ...\n\n")
+                self.dlg.Show()
+                
                 os.chdir(self.dossierSortie)
                 if not os.path.exists(self.titreCarte):
                     os.mkdir(self.titreCarte)
                 os.chdir(self.titreCarte)
                 self.genererDossier(self.dossier, os.getcwd())
                 
+                if self.ajouterCarteMentale:
+                    self.dlg.SetMessage(u"Génération de la carte mentale ...\n\n")
+                    self.creerCarte(os.path.join(self.dossierSortie, self.titreCarte, self.titreCarte), self.titreCarte, os.path.join(self.dossierSortie, self.titreCarte))
+                    
                 wx.EndBusyCursor()
                 
+                self.dlg.SetMessage(u"Le dossier clone à été correctement générée\n\n" \
+                                       u"Fichier :\n" + self.dossier)
+                self.dlg.Destroy()
+            
+            
                 dlg = wx.MessageDialog(self, u"Le dossier a été correctement généré\n\n" \
                                        u"Dossier :\n" + os.path.join(self.dossierSortie, self.titreCarte), 
                                        u"Génération terminée",
@@ -556,6 +588,12 @@ class pyXorgFrame(wx.Frame):
                 dlg.ShowModal()
                 dlg.Destroy()
             
+            else:
+                dlg = wx.MessageDialog(self, u"Le dossier cible n'existe pas !\n\n" + self.dossierSortie, 
+                                       u"Dossier inexistant",
+                               wx.OK | wx.ICON_ERROR)
+                dlg.ShowModal()
+                dlg.Destroy()   
 
             
     ##########################################################################################
@@ -577,6 +615,32 @@ class pyXorgFrame(wx.Frame):
             
             
     ##########################################################################################
+    def creerCarte(self, nomFichier, titreCarte, dossier):
+        # Version sdk
+        if os.path.splitext(nomFichier)[1] != ".xmind":
+            nomFichier = os.path.splitext(nomFichier)[0] + ".xmind"
+        xm = xmind.load(nomFichier)
+        first_sheet = xm.getPrimarySheet() # get the first sheet
+        first_sheet.setTitle(titreCarte) # set its title
+        root_topic = first_sheet.getRootTopic() # get the root topic of this sheet
+        root_topic.setTitle(titreCarte) # set its title
+        root_topic.setAttribute("structure-class", "org.xmind.ui.logic.right")
+        # Version mekk
+#        xmind = XMindDocument.create(titreCarte, titreCarte)
+#        first_sheet = xmind.get_first_sheet()
+#        root_topic = first_sheet.get_root_topic()
+
+        self.genererCarte(dossier, root_topic)
+        
+        # mekk
+#        xmind.save(nomFichier)
+        
+        # sdk
+        xmind.save(xm, nomFichier) # and we save
+        
+        
+        
+    ##########################################################################################
     def genererCarte(self, path, topic):
         vide = True
 
@@ -584,6 +648,7 @@ class pyXorgFrame(wx.Frame):
             return
 
         dirs = os.listdir(path)
+#        print dirs
         
         for file in dirs:
             
@@ -607,14 +672,20 @@ class pyXorgFrame(wx.Frame):
                         if EXCLURE_DOSSIERS_VIDE and not dv:
                             topic.addSubTopic(t)
                             vide = False
-                        
-                        
+#                    self.count += 1
+                    self.dlg.Augmenter()
+                else:
+                    self.dlg.Augmenter(fcount(path_file))
+#                    self.count += fcount(path_file)
+#                self.dlg.Augmenter()
+                
+                
             else:
                 ext = os.path.splitext(file)[1]
                 typ, nom = GetTypeNom(file)
                 inclureF = self.getListNomGlob(path, self.inclure_Fic)
                 exclureF = self.getListNomGlob(path, self.exclure_Fic)
-                if not file in exclureF and file in inclureF and typ in self.inclure_Typ:
+                if not file in exclureF and file in inclureF and (typ in self.inclure_Typ or type == None):
                     # mekk
 #                    t = topic.add_subtopic(GetNomSimple(file, typ))
 #                    t.set_link(os.path.join(path, file))
@@ -665,7 +736,10 @@ class pyXorgFrame(wx.Frame):
                         else:
                             os.chdir(sortie)
                             os.rmdir(file)
-                        
+                    
+                    self.dlg.Augmenter()
+                else:
+                    self.dlg.Augmenter(fcount(path_file))
                         
             else:
                 ext = os.path.splitext(file)[1]
@@ -740,8 +814,9 @@ class pyXorgFrame(wx.Frame):
             return
         
         config = ConfigParser.ConfigParser()
+        config.readfp(codecs.open(FICHIER_TYPES, "r", DEFAUT_ENCODING))
         
-        config.read(FICHIER_TYPES)
+#        config.read(FICHIER_TYPES)
         SEPARATEUR = config.get("Format", "Separateur", u"")[1:-1]
         TYPES = {}
         
@@ -750,14 +825,12 @@ class pyXorgFrame(wx.Frame):
         while continuer:
             try :
                 t = config.get("Types", "T"+str(i))
-                print t
-                n, p, f = t.split("#")
-                TYPES[n] = [p, f]
+                p, n, f = t.split("#")
+                TYPES[p] = [n, f]
                 i += 1
             except:
                 continuer = False
-#            if i == 100:
-#                continuer = False
+
         
     #############################################################################
     def enregistrerCFG(self):
@@ -787,7 +860,7 @@ class URLSelectorCombo(wx.Panel):
     def __init__(self, parent, app, lien = "", typ = "D", ext = ""):
         wx.Panel.__init__(self, parent, -1)
         
-        print "INIT URLSelectorCombo", typ, lien
+#        print "INIT URLSelectorCombo", typ, lien
         
         self.app = app
         
@@ -871,15 +944,69 @@ class URLSelectorCombo(wx.Panel):
                 self.texte.SetBackgroundColour(("white"))
             else:
                 self.texte.SetBackgroundColour(("pink"))
+                self.lien = u""
         else:
             self.texte.ChangeValue(toDefautEncoding(lien))
             self.lien = lien
             
         self.app.OnPathModified(self, self.lien)
         self.Refresh()
-        
     
+    ##########################################################################################
+    def SetToolTipString(self, s):
+        self.texte.SetToolTipString(s)
         
+        
+        
+        
+        
+import  wx.lib.scrolledpanel as scrolled
+class PanelInclureExclureTypes(scrolled.ScrolledPanel):
+    def __init__(self, parent, app, inclure = [], exclure = []):
+        scrolled.ScrolledPanel.__init__(self, parent, -1)
+        self.SetupScrolling()
+        
+        self.app = app
+        
+        self.cbI = {}
+        self.cbE = {}
+        sizer = wx.GridBagSizer(5,2)
+        
+        sizer.Add(wx.StaticText(self, -1, u"Inclure"), (0, 0), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        sizer.Add(wx.StaticText(self, -1, u"Exclure"), (0, 1), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        sizer.Add(wx.StaticText(self, -1, u"Préfixe"), (0, 2), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        sizer.Add(wx.StaticText(self, -1, u"Nom"), (0, 3), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        
+        i = 1
+        for p, nm in TYPES.items():
+            self.cbI[p] = wx.CheckBox(self, -1, u"")
+            self.cbI[p].SetValue(p in inclure)
+            self.Bind(wx.EVT_CHECKBOX, self.EvtCheckBox, self.cbI[p])
+            
+            self.cbE[p] = wx.CheckBox(self, -1, u"")
+            self.cbE[p].SetValue(p in exclure)
+            self.Bind(wx.EVT_CHECKBOX, self.EvtCheckBox, self.cbE[p])
+            
+            sizer.Add(self.cbI[p], (i, 0), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
+            sizer.Add(self.cbE[p], (i, 1), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
+            sizer.Add(wx.StaticText(self, -1, p), (i, 2), flag = wx.EXPAND|wx.LEFT, border = 5)
+            sizer.Add(wx.StaticText(self, -1, nm[0]), (i, 3), flag = wx.EXPAND|wx.LEFT, border = 5)
+            
+            i += 1
+      
+        sizer.AddGrowableCol(3)
+        self.SetSizer(sizer)
+        
+        
+    ##########################################################################################
+    def EvtCheckBox(self, event):
+        inclure = [k for k in self.cbI.keys() if self.cbI[k].IsChecked()]
+        exclure = [k for k in self.cbE.keys() if self.cbE[k].IsChecked()]
+       
+        self.app.MiseAJourFiltres(inclure, exclure, typ = "T")
+        
+            
+            
         
 class PanelInclureExclure(wx.Panel):
     def __init__(self, parent, app, typ = "D", inclure = [], exclure = []):
@@ -893,10 +1020,30 @@ class PanelInclureExclure(wx.Panel):
         ti = wx.StaticText(self, -1, u"Inclure")
         te = wx.StaticText(self, -1, u"Exclure")
         
+        if typ == "D": n = u"dossiers"
+        elif typ == "F": n = u"fichiers"
+        
+        
         si = self.si = wx.TextCtrl(self, -1, u"\n".join(inclure), style=wx.TE_MULTILINE)
         self.Bind(wx.EVT_TEXT, self.EvtText, si)
+ 
+        t_i = u"Spécifier les %s à inclure (les seuls qui figureront dans la structure)\n" \
+             u"exemples :\n" \
+             u"\t* \ttous les %s\n" \
+             u"\tC* \tseulement ceux qui commencent par un \"C\"" %(n, n)
+        if typ == "F":
+            t_i += u"\n\t*.pdf \tseulement les PDF\n"    
+    
+        si.SetToolTipString(t_i)
         se = self.se = wx.TextCtrl(self, -1, u"\n".join(exclure), style=wx.TE_MULTILINE)
         self.Bind(wx.EVT_TEXT, self.EvtText, se)
+        t_e = u"Spécifier les %s à exclure (ceux qui ne figureront pas dans la structure)\n" \
+             u"exemples :\n" \
+             u"\t* \ttous les %s\n" \
+             u"\tC* \tseulement ceux qui commencent par un \"C\"" %(n ,n)
+        if typ == "F":
+            t_e += u"\n\t*.pdf \tseulement les PDF\n"
+        se.SetToolTipString(t_e)
 
         gbs = wx.GridBagSizer()
         gbs.Add(ti, (0,0), flag = wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, border = 4)
@@ -907,6 +1054,7 @@ class PanelInclureExclure(wx.Panel):
         
         self.SetSizer(gbs)
         
+    ##########################################################################################
     def EvtText(self, event):
         s = event.GetString()
         if event.GetEventObject() == self.si:
@@ -915,6 +1063,71 @@ class PanelInclureExclure(wx.Panel):
             self.exclure = s.split("\n")
         self.app.MiseAJourFiltres(self.inclure, self.exclure, typ = self.typ)
 
+
+class ProgressDialog(wx.Dialog):
+    def __init__(
+            self, parent, ID, title, maxi, size=wx.DefaultSize, pos=wx.DefaultPosition, 
+            style=wx.DEFAULT_DIALOG_STYLE,
+            ):
+
+        # Instead of calling wx.Dialog.__init__ we precreate the dialog
+        # so we can set an extra style that must be set before
+        # creation, and then we create the GUI object using the Create
+        # method.
+        pre = wx.PreDialog()
+        pre.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
+        pre.Create(parent, ID, title, pos, size, style)
+
+        # This next step is the most important, it turns this Python
+        # object into the real wrapper of the dialog (instead of pre)
+        # as far as the wxPython extension is concerned.
+        self.PostCreate(pre)
+
+        # Now continue with the normal construction of the dialog
+        # contents
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.label = wx.StaticText(self, -1, u"")
+        sizer.Add(self.label, 0, wx.ALIGN_CENTRE|wx.ALL|wx.EXPAND, 5)
+
+        self.gauge = wx.Gauge(self, -1, maxi)
+        sizer.Add(self.gauge, 0, wx.ALIGN_CENTRE|wx.ALL|wx.EXPAND, 5)
+        self.count = 0
+        
+        btnsizer = wx.StdDialogButtonSizer()
+        
+        if wx.Platform != "__WXMSW__":
+            btn = wx.ContextHelpButton(self)
+            btnsizer.AddButton(btn)
+        
+        btn = wx.Button(self, wx.ID_OK)
+#        btn.SetHelpText(u"")
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+        
+        btnsizer.Realize()
+
+        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+
+        self.SetSizer(sizer)
+        sizer.Fit(self)
+
+
+    ##########################################################################################
+    def Augmenter(self, n = 1):
+        self.count += n
+        self.gauge.SetValue(self.count)
+        self.Update()
+        self.Refresh()
+
+    ##########################################################################################
+    def SetMessage(self, t):
+        self.label.SetLabel(t)
+        self.Update()
+        self.Layout()
+        self.Refresh()
+        
+        
 #############################################################################################################
 def messageErreur(parent, titre, message):
     dlg = wx.MessageDialog(parent, message, titre,
