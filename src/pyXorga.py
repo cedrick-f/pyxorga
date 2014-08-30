@@ -77,7 +77,6 @@ FICHIER_TYPES = os.path.join(PATH, "Types.cfg")
 FILE_ENCODING = sys.getfilesystemencoding()
 DEFAUT_ENCODING = "utf-8"
 
-
 #######################################################################################################
 #   Paramètres par défaut
 #######################################################################################################
@@ -152,6 +151,18 @@ def GetTypeNom(nFich):
                 return t, parties[1]
     return None, nFich
 
+
+def GetType(nFich):
+    """    Renvoie le type du document
+    """
+    parties = nFich.split(SEPARATEUR)
+    if len(parties) > 1:
+        for t in TYPES.keys():
+            if parties[0] == t:
+                return t
+    return None
+
+
 def GetNomSimple(file, typ):
     return os.path.splitext(file[len(TYPES[typ][0]):])[0]
     
@@ -210,12 +221,37 @@ SECTION_FILTRE = u"Filtres"
 #    def OnInit(self):
 #        wx.Log.SetLogLevel(0) # ?? Pour éviter le plantage de wxpython 3.0 avec Win XP pro ???
 #        
+##########################################################################################
 def fcount(path):
     count1 = 0
     for root, dirs, files in os.walk(path):
             count1 += len(dirs)
 
     return count1
+
+
+##########################################################################################
+def getListNomGlob(path, liste):
+    os.chdir(path)
+    
+    l = []
+    for f in liste:
+        l.extend(glob.glob(f))
+#        l = [f.encode(FILE_ENCODING) for f in l]
+    return l
+
+
+##########################################################################################
+def estInclus(dossier1, dossier2):
+    """ Vérifie si dossier1 est un sous-dossier de dossier2
+    """
+#    print "estInclus : "
+#    print "  ", dossier1
+#    print "  ", dossier2
+#    print "  ", dossier1[:len(dossier2)]
+    if len(dossier1) < len(dossier2):
+        return False
+    return dossier1[:len(dossier2)] == dossier2
 
 
 
@@ -335,7 +371,7 @@ class pyXorgFrame(wx.Frame):
         box = wx.StaticBox(p, -1, u"Fichier XMind")
         bsizerx = wx.StaticBoxSizer(box, wx.HORIZONTAL)
 
-        c = URLSelectorCombo(p, self, self.nomFichier, "F")
+        c = URLSelectorCombo(p, self,  self.nomFichier, "F")
         bsizerx.Add(c, 1, wx.ALL|wx.EXPAND, 5)
         self.selecteur_F = c
         
@@ -358,7 +394,7 @@ class pyXorgFrame(wx.Frame):
         bsizers = wx.StaticBoxSizer(box, wx.HORIZONTAL)
 
         vs = wx.BoxSizer(wx.VERTICAL)
-        c = URLSelectorCombo(p, self, self.dossierSortie, "D")
+        c = URLSelectorCombo(p, self,  self.dossierSortie, "D")
         self.selecteur_DS = c
         vs.Add(c, 1, wx.ALL|wx.EXPAND, 2)
         
@@ -423,7 +459,11 @@ class pyXorgFrame(wx.Frame):
         # Interception de la demande de fermeture
         self.Bind(wx.EVT_CLOSE, self.OnClose)
 
-
+        self.selecteur_D.SetPath(self.dossier)
+        self.selecteur_F.SetPath(self.nomFichier)
+        self.selecteur_DS.SetPath(self.dossierSortie)
+        
+        
     ##########################################################################################
     def EvtText(self, event):
         self.titreCarte = event.GetString()
@@ -434,8 +474,10 @@ class pyXorgFrame(wx.Frame):
         self.ajouterCarteMentale = event.IsChecked()
         
         
+    
     ##########################################################################################
     def testerDossierExistant(self):
+        print "testerDossierExistant"
         
         os.chdir(self.dossierSortie)
         d = os.path.join(self.dossierSortie, self.titreCarte)
@@ -452,7 +494,10 @@ class pyXorgFrame(wx.Frame):
             if retCode == wx.ID_YES:
                 os.chdir(d)
                 for f in os.listdir(d):
-                    shutil.rmtree(f, ignore_errors = True)
+                    if os.path.isdir(f):
+                        shutil.rmtree(f, ignore_errors = False, onerror=onerror)
+                    else:
+                        os.remove(f)
                 os.chdir(d)
             elif retCode == wx.ID_NO:
                 return False
@@ -514,31 +559,14 @@ class pyXorgFrame(wx.Frame):
             except:
                 pass
             
-            wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
+            th = ThreadDossier(self, mode = 0)
             
-            nDossiers = fcount(self.dossier)
-            self.dlg =    ProgressDialog(None, -1, u"Génération de la carte", nDossiers)
-
-#            self.count = 0
-
-            self.dlg.SetMessage(u"Génération de la carte mentale ...\n\n")
+            self.dlg =    ProgressFrame(None, -1, u"Génération de la carte", th)
             self.dlg.Show()
-            
-            self.creerCarte(self.nomFichier, self.titreCarte, self.dossier)
-            
-            wx.EndBusyCursor()
-            
-            self.dlg.SetMessage(u"La carte mentale à été correctement générée\n\n" \
-                                       u"Fichier :\n" + self.nomFichier)
-            self.dlg.Destroy()
-            
-            self.boutonOuvrirXMind.Enable(True)
-#            dlg = wx.MessageDialog(self, u"La carte mentale à été correctement générée\n\n" \
-#                                   u"Fichier :\n" + self.nomFichier, 
-#                                   u"Génération terminée",
-#                           wx.OK | wx.ICON_INFORMATION)
-#            dlg.ShowModal()
-#            dlg.Destroy()
+            th.SetDlg(self.dlg)
+            th.start()
+
+
             
 
 
@@ -557,36 +585,19 @@ class pyXorgFrame(wx.Frame):
                 pass
             
             if self.testerDossierExistant():
-                wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
-                
-                nDossiers = fcount(self.dossier)
-                self.dlg =    ProgressDialog(None, -1, u"Génération du dossier clone", nDossiers)
-                self.dlg.SetMessage(u"Génération du dossier clone ...\n\n")
-                self.dlg.Show()
                 
                 os.chdir(self.dossierSortie)
                 if not os.path.exists(self.titreCarte):
                     os.mkdir(self.titreCarte)
                 os.chdir(self.titreCarte)
-                self.genererDossier(self.dossier, os.getcwd())
                 
-                if self.ajouterCarteMentale:
-                    self.dlg.SetMessage(u"Génération de la carte mentale ...\n\n")
-                    self.creerCarte(os.path.join(self.dossierSortie, self.titreCarte, self.titreCarte), self.titreCarte, os.path.join(self.dossierSortie, self.titreCarte))
-                    
-                wx.EndBusyCursor()
+                th = ThreadDossier(self, mode = 1)
                 
-                self.dlg.SetMessage(u"Le dossier clone à été correctement générée\n\n" \
-                                       u"Fichier :\n" + self.dossier)
-                self.dlg.Destroy()
-            
-            
-                dlg = wx.MessageDialog(self, u"Le dossier a été correctement généré\n\n" \
-                                       u"Dossier :\n" + os.path.join(self.dossierSortie, self.titreCarte), 
-                                       u"Génération terminée",
-                               wx.OK | wx.ICON_INFORMATION)
-                dlg.ShowModal()
-                dlg.Destroy()
+                self.dlg = ProgressFrame(None, -1, u"Génération du dossier clone", th)
+                self.dlg.Show()
+                th.SetDlg(self.dlg)
+                th.start()
+                
             
             else:
                 dlg = wx.MessageDialog(self, u"Le dossier cible n'existe pas !\n\n" + self.dossierSortie, 
@@ -596,15 +607,7 @@ class pyXorgFrame(wx.Frame):
                 dlg.Destroy()   
 
             
-    ##########################################################################################
-    def getListNomGlob(self, path, liste):
-        os.chdir(path)
-        
-        l = []
-        for f in liste:
-            l.extend(glob.glob(f))
-#        l = [f.encode(FILE_ENCODING) for f in l]
-        return l
+    
 
     
     
@@ -614,159 +617,169 @@ class pyXorgFrame(wx.Frame):
             
             
             
-    ##########################################################################################
-    def creerCarte(self, nomFichier, titreCarte, dossier):
-        # Version sdk
-        if os.path.splitext(nomFichier)[1] != ".xmind":
-            nomFichier = os.path.splitext(nomFichier)[0] + ".xmind"
-        xm = xmind.load(nomFichier)
-        first_sheet = xm.getPrimarySheet() # get the first sheet
-        first_sheet.setTitle(titreCarte) # set its title
-        root_topic = first_sheet.getRootTopic() # get the root topic of this sheet
-        root_topic.setTitle(titreCarte) # set its title
-        root_topic.setAttribute("structure-class", "org.xmind.ui.logic.right")
-        # Version mekk
-#        xmind = XMindDocument.create(titreCarte, titreCarte)
-#        first_sheet = xmind.get_first_sheet()
-#        root_topic = first_sheet.get_root_topic()
+#    ##########################################################################################
+#    def creerCarte(self, nomFichier, titreCarte, dossier):
+#        # Version sdk
+#        if os.path.splitext(nomFichier)[1] != ".xmind":
+#            nomFichier = os.path.splitext(nomFichier)[0] + ".xmind"
+#        xm = xmind.load(nomFichier)
+#        first_sheet = xm.getPrimarySheet() # get the first sheet
+#        first_sheet.setTitle(titreCarte) # set its title
+#        root_topic = first_sheet.getRootTopic() # get the root topic of this sheet
+#        root_topic.setTitle(titreCarte) # set its title
+#        root_topic.setAttribute("structure-class", "org.xmind.ui.logic.right")
+#        # Version mekk
+##        xmind = XMindDocument.create(titreCarte, titreCarte)
+##        first_sheet = xmind.get_first_sheet()
+##        root_topic = first_sheet.get_root_topic()
+#
+#        self.genererCarte(dossier, root_topic)
+#        
+#        # mekk
+##        xmind.save(nomFichier)
+#        
+#        # sdk
+#        xmind.save(xm, nomFichier) # and we save
+#        
+#        
+#        
+#    ##########################################################################################
+#    def genererCarte(self, path, topic):
+#        vide = True
+#
+#        if not os.path.exists(path) or len(path) > 255:
+#            return
+#
+#        dirs = os.listdir(path)
+##        print dirs
+#        
+#        for file in dirs:
+#            
+#            path_file = os.path.join(path, file)
+#            
+#            if os.path.isdir(path_file):
+#                inclureD = getListNomGlob(path, self.inclure_Dir)
+#                exclureD = getListNomGlob(path, self.exclure_Dir)
+#                if not file in exclureD and file in inclureD:
+#                    if len(os.listdir(path))>0:
+#                        # mekk
+##                        t = topic.add_subtopic(file)
+#                        
+#                        # sdk
+#                        t = TopicElement()
+#                        t.setTitle(file)
+#                        t.addMarker("Folder.png")
+#
+#                        dv = self.genererCarte(path_file, t)
+#                        
+#                        if EXCLURE_DOSSIERS_VIDE and not dv:
+#                            topic.addSubTopic(t)
+#                            vide = False
+##                    self.count += 1
+#                    self.dlg.Augmenter()
+#                else:
+#                    self.dlg.Augmenter(fcount(path_file))
+##                    self.count += fcount(path_file)
+##                self.dlg.Augmenter()
+#                
+#                
+#            else:
+#                ext = os.path.splitext(file)[1]
+#                typ, nom = GetTypeNom(file)
+#                inclureF = getListNomGlob(path, self.inclure_Fic)
+#                exclureF = getListNomGlob(path, self.exclure_Fic)
+#                if not file in exclureF and file in inclureF and (typ in self.inclure_Typ or typ == None):
+#                    # mekk
+##                    t = topic.add_subtopic(GetNomSimple(file, typ))
+##                    t.set_link(os.path.join(path, file))
+##                    t.add_marker(TYPES[typ][1])
+#                    
+#                    # sdk
+#                    t = TopicElement()
+#                    if ext != "":
+#                        tx = nom.split(ext)[0]
+#                    else:
+#                        tx = nom
+#                    t.setTitle(tx)
+##                    t.setFileHyperlink(os.path.join(path, file)) # set a file hyperlink
+#                    
+#                    t.setFileHyperlink("file://" + utils.get_abs_path(os.path.join(path, file)))
+#                    if typ != None:
+#                        t.addMarker(TYPES[typ][1])
+#                    
+#                    topic.addSubTopic(t)
+#
+#                    vide = False
+#        return vide
 
-        self.genererCarte(dossier, root_topic)
-        
-        # mekk
-#        xmind.save(nomFichier)
-        
-        # sdk
-        xmind.save(xm, nomFichier) # and we save
-        
-        
-        
-    ##########################################################################################
-    def genererCarte(self, path, topic):
-        vide = True
 
-        if not os.path.exists(path) or len(path) > 255:
-            return
-
-        dirs = os.listdir(path)
-#        print dirs
-        
-        for file in dirs:
-            
-            path_file = os.path.join(path, file)
-            
-            if os.path.isdir(path_file):
-                inclureD = self.getListNomGlob(path, self.inclure_Dir)
-                exclureD = self.getListNomGlob(path, self.exclure_Dir)
-                if not file in exclureD and file in inclureD:
-                    if len(os.listdir(path))>0:
-                        # mekk
-#                        t = topic.add_subtopic(file)
-                        
-                        # sdk
-                        t = TopicElement()
-                        t.setTitle(file)
-                        t.addMarker("Folder.png")
-
-                        dv = self.genererCarte(path_file, t)
-                        
-                        if EXCLURE_DOSSIERS_VIDE and not dv:
-                            topic.addSubTopic(t)
-                            vide = False
-#                    self.count += 1
-                    self.dlg.Augmenter()
-                else:
-                    self.dlg.Augmenter(fcount(path_file))
-#                    self.count += fcount(path_file)
-#                self.dlg.Augmenter()
-                
-                
-            else:
-                ext = os.path.splitext(file)[1]
-                typ, nom = GetTypeNom(file)
-                inclureF = self.getListNomGlob(path, self.inclure_Fic)
-                exclureF = self.getListNomGlob(path, self.exclure_Fic)
-                if not file in exclureF and file in inclureF and (typ in self.inclure_Typ or type == None):
-                    # mekk
-#                    t = topic.add_subtopic(GetNomSimple(file, typ))
-#                    t.set_link(os.path.join(path, file))
-#                    t.add_marker(TYPES[typ][1])
-                    
-                    # sdk
-                    t = TopicElement()
-                    t.setTitle(nom.split(ext)[0])
-#                    t.setFileHyperlink(os.path.join(path, file)) # set a file hyperlink
-                    
-                    t.setFileHyperlink("file://" + utils.get_abs_path(os.path.join(path, file)))
-                    if typ != None:
-                        t.addMarker(TYPES[typ][1])
-                    
-                    topic.addSubTopic(t)
-
-                    vide = False
-        return vide
-
-
-    ##########################################################################################
-    def genererDossier(self, path, sortie):
-        vide = True
-        try:
-            sortie = unicode(sortie, DEFAUT_ENCODING)
-        except:
-            pass
-        
-        if not os.path.exists(path) or len(path) > 255:
-            return
-        
-        dirs = os.listdir(path)
-
-        for file in dirs:  
-            path_file = os.path.join(path, file)
-
-            if os.path.isdir(path_file):
-                inclureD = self.getListNomGlob(path, self.inclure_Dir)
-                exclureD = self.getListNomGlob(path, self.exclure_Dir)
-                if not file in exclureD and file in inclureD:
-                    if len(os.listdir(path))>0:
-                        os.chdir(sortie)
-                        os.mkdir(file)
-                        dv = self.genererDossier(path_file, os.path.join(sortie, file))
-                        
-                        if EXCLURE_DOSSIERS_VIDE and not dv:
-                            vide = False
-                        else:
-                            os.chdir(sortie)
-                            os.rmdir(file)
-                    
-                    self.dlg.Augmenter()
-                else:
-                    self.dlg.Augmenter(fcount(path_file))
-                        
-            else:
-                ext = os.path.splitext(file)[1]
-                typ, nom = GetTypeNom(file)
-                inclureF = self.getListNomGlob(path, self.inclure_Fic)
-                exclureF = self.getListNomGlob(path, self.exclure_Fic)
-                if not file in exclureF and file in inclureF and typ in self.inclure_Typ:
-                    shutil.copy2(os.path.join(path, file), sortie)
-
-                    vide = False
-        return vide
+#    ##########################################################################################
+#    def genererDossier(self, path, sortie):
+#        vide = True
+#        try:
+#            sortie = unicode(sortie, DEFAUT_ENCODING)
+#        except:
+#            pass
+#        
+#        if not os.path.exists(path) or len(path) > 255:
+#            return
+#        
+#        dirs = os.listdir(path)
+#
+#        for file in dirs:  
+#            path_file = os.path.join(path, file)
+#
+#            if os.path.isdir(path_file):
+#                inclureD = getListNomGlob(path, self.inclure_Dir)
+#                exclureD = getListNomGlob(path, self.exclure_Dir)
+#                if not file in exclureD and file in inclureD:
+#                    if len(os.listdir(path))>0:
+#                        os.chdir(sortie)
+#                        os.mkdir(file)
+#                        dv = self.genererDossier(path_file, os.path.join(sortie, file))
+#                        
+#                        if EXCLURE_DOSSIERS_VIDE and not dv:
+#                            vide = False
+#                        else:
+#                            os.chdir(sortie)
+#                            os.rmdir(file)
+#                    
+#                    self.dlg.Augmenter()
+#                    self.dlg.SetInfo(file)
+#                else:
+#                    self.dlg.Augmenter(fcount(path_file))
+#                    self.dlg.SetInfo(file)
+#                        
+#            else:
+#                ext = os.path.splitext(file)[1]
+#                typ, nom = GetTypeNom(file)
+#                inclureF = getListNomGlob(path, self.inclure_Fic)
+#                exclureF = getListNomGlob(path, self.exclure_Fic)
+#                if not file in exclureF and file in inclureF and (typ in self.inclure_Typ or typ == None):
+#                    shutil.copy2(os.path.join(path, file), sortie)
+#
+#                    vide = False
+#        return vide
     
     
     #############################################################################
     def OnPathModified(self, selecteur, lien):
-        if selecteur == self.selecteur_F:
+        if hasattr(self, "selecteur_F") and selecteur == self.selecteur_F:
             self.nomFichier = lien
             self.boutonOuvrirXMind.Enable(os.path.exists(self.nomFichier))
 
-        elif   selecteur == self.selecteur_D:
+        elif hasattr(self, "selecteur_D") and selecteur == self.selecteur_D:
             self.dossier = lien
             self.ctrlTitre.SetValue(os.path.basename(self.dossier))
             self.boutonGenererXMind.Enable(self.nomFichier != u"")
         
-        elif   selecteur == self.selecteur_DS:
-            self.dossierSortie = lien
-            self.boutonGenererClone.Enable(self.dossierSortie != u"")
+        elif hasattr(self, "selecteur_DS") and selecteur == self.selecteur_DS:
+            if not estInclus(lien, self.dossier) or lien == u"":
+                self.dossierSortie = lien
+                self.boutonGenererClone.Enable(self.dossierSortie != u"")
+            else:
+                self.selecteur_DS.marquerErreur(u"Le dossier de destination ne DOIT PAS être un sous dossier du dossier source !")
+                
     
     #############################################################################
     def MiseAJourFiltres(self, inc, exc, typ = "D"):
@@ -886,10 +899,10 @@ class URLSelectorCombo(wx.Panel):
                        u"Tous les fichiers|*.*'"
         self.typ = typ
         
-        
         sizer.Add(self.texte,1,flag = wx.EXPAND)
         self.SetSizerAndFit(sizer)
-        self.lien = lien
+#        self.SetPath(lien)
+#        self.lien = lien
      
 
     # Overridden from ComboCtrl, called when the combo button is clicked
@@ -941,9 +954,10 @@ class URLSelectorCombo(wx.Panel):
             if os.path.exists(lien) and os.path.isdir(lien):
                 self.texte.ChangeValue(toDefautEncoding(lien)) # On le met en DEFAUT_ENCODING
                 self.lien = lien
-                self.texte.SetBackgroundColour(("white"))
+                self.marquerErreur()
+                
             else:
-                self.texte.SetBackgroundColour(("pink"))
+                self.marquerErreur(lien + u" n'est pas un dossier valide !")
                 self.lien = u""
         else:
             self.texte.ChangeValue(toDefautEncoding(lien))
@@ -952,6 +966,17 @@ class URLSelectorCombo(wx.Panel):
         self.app.OnPathModified(self, self.lien)
         self.Refresh()
     
+    
+    ##########################################################################################
+    def marquerErreur(self, message = None):
+        if message != None:
+            self.texte.SetBackgroundColour(("pink"))
+            self.texte.SetToolTipString(message)
+        else:
+            self.texte.SetBackgroundColour(("white"))
+            self.texte.SetToolTipString(u"")
+            
+            
     ##########################################################################################
     def SetToolTipString(self, s):
         self.texte.SetToolTipString(s)
@@ -972,12 +997,38 @@ class PanelInclureExclureTypes(scrolled.ScrolledPanel):
         self.cbE = {}
         sizer = wx.GridBagSizer(5,2)
         
-        sizer.Add(wx.StaticText(self, -1, u"Inclure"), (0, 0), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
-        sizer.Add(wx.StaticText(self, -1, u"Exclure"), (0, 1), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
-        sizer.Add(wx.StaticText(self, -1, u"Préfixe"), (0, 2), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
-        sizer.Add(wx.StaticText(self, -1, u"Nom"), (0, 3), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        t = wx.StaticText(self, -1, u"Inclure")
+        t.SetFont(FONT_IE)
+        sizer.Add(t, (1, 0), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
+        t = wx.StaticText(self, -1, u"Exclure")
+        t.SetFont(FONT_IE)
+        sizer.Add(t, (1, 1), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
+        t = wx.StaticText(self, -1, u"Préfixe")
+        t.SetFont(FONT_IE)
+        sizer.Add(t, (1, 2), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
+        t = wx.StaticText(self, -1, u"Type de document")
+        t.SetFont(FONT_IE)
+        sizer.Add(t, (1, 3), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT, border = 5)
         
-        i = 1
+        tte = u"Selectionner tous les types de document"
+        self.cbIt = wx.CheckBox(self, -1, u"")
+        self.cbIt.SetToolTipString(tte)
+        self.cbIt.SetValue(False)
+        self.Bind(wx.EVT_CHECKBOX, self.EvtCheckBox, self.cbIt)
+        
+        self.cbEt = wx.CheckBox(self, -1, u"")
+        self.cbEt.SetToolTipString(tte)
+        self.cbEt.SetValue(False)
+        self.Bind(wx.EVT_CHECKBOX, self.EvtCheckBox, self.cbEt)
+        
+        sizer.Add(self.cbIt, (0, 0), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        sizer.Add(self.cbEt, (0, 1), flag = wx.EXPAND|wx.ALIGN_CENTER_HORIZONTAL|wx.LEFT|wx.RIGHT|wx.TOP, border = 5)
+        t = wx.StaticText(self, -1, u"Tous")
+        t.SetToolTipString(tte)
+        t.SetFont(FONT_ITALIC)
+        sizer.Add(t, (0, 2), (1, 2), flag = wx.EXPAND|wx.LEFT|wx.TOP, border = 5)
+        
+        i = 2
         for p, nm in TYPES.items():
             self.cbI[p] = wx.CheckBox(self, -1, u"")
             self.cbI[p].SetValue(p in inclure)
@@ -1000,9 +1051,19 @@ class PanelInclureExclureTypes(scrolled.ScrolledPanel):
         
     ##########################################################################################
     def EvtCheckBox(self, event):
+        if event.GetEventObject() == self.cbIt:
+            for k in self.cbI.values():
+                k.SetValue(event.IsChecked())
+        elif event.GetEventObject() == self.cbEt:
+            for k in self.cbE.values():
+                k.SetValue(event.IsChecked())
+        
         inclure = [k for k in self.cbI.keys() if self.cbI[k].IsChecked()]
         exclure = [k for k in self.cbE.keys() if self.cbE[k].IsChecked()]
        
+        self.cbIt.SetValue(len(inclure) == len(self.cbI))
+        self.cbEt.SetValue(len(exclure) == len(self.cbE))
+        
         self.app.MiseAJourFiltres(inclure, exclure, typ = "T")
         
             
@@ -1018,7 +1079,9 @@ class PanelInclureExclure(wx.Panel):
         self.app = app
         
         ti = wx.StaticText(self, -1, u"Inclure")
+        ti.SetFont(FONT_IE)
         te = wx.StaticText(self, -1, u"Exclure")
+        te.SetFont(FONT_IE)
         
         if typ == "D": n = u"dossiers"
         elif typ == "F": n = u"fichiers"
@@ -1064,70 +1127,368 @@ class PanelInclureExclure(wx.Panel):
         self.app.MiseAJourFiltres(self.inclure, self.exclure, typ = self.typ)
 
 
-class ProgressDialog(wx.Dialog):
+import threading
+import  wx.lib.newevent
+(UpdateProgressEvent, EVT_UPDATE_PROGRESS) = wx.lib.newevent.NewEvent()
+
+class ThreadDossier(threading.Thread): 
+    def __init__(self, frm, mode): 
+        threading.Thread.__init__(self)
+        
+        self.frm = frm
+        self.mode = mode
+        
+        self._stopevent = threading.Event( )
+        
+    ##########################################################################################
+    def SetDlg(self, dlg):
+        self.dlg = dlg
+        
+    ##########################################################################################
+    def creerCarte(self, nomFichier, titreCarte, dossier):
+        # Version sdk
+        if os.path.splitext(nomFichier)[1] != ".xmind":
+            nomFichier = os.path.splitext(nomFichier)[0] + ".xmind"
+        xm = xmind.load(nomFichier)
+        first_sheet = xm.getPrimarySheet() # get the first sheet
+        first_sheet.setTitle(titreCarte) # set its title
+        root_topic = first_sheet.getRootTopic() # get the root topic of this sheet
+        root_topic.setTitle(titreCarte) # set its title
+        root_topic.setAttribute("structure-class", "org.xmind.ui.logic.right")
+        # Version mekk
+#        xmind = XMindDocument.create(titreCarte, titreCarte)
+#        first_sheet = xmind.get_first_sheet()
+#        root_topic = first_sheet.get_root_topic()
+
+        self.genererCarte(dossier, root_topic)
+        
+        # mekk
+#        xmind.save(nomFichier)
+        
+        # sdk
+        xmind.save(xm, nomFichier) # and we save
+        
+    ##########################################################################################
+    def fileOk(self, path, file):
+        inclureF = getListNomGlob(path, self.frm.inclure_Fic)
+        exclureF = getListNomGlob(path, self.frm.exclure_Fic)
+        typ = GetType(file)
+        return not file in exclureF and file in inclureF \
+                    and (not typ in self.frm.exclure_Typ and (typ in self.frm.inclure_Typ or len(self.frm.inclure_Typ) == 0))
+         
+        
+    ##########################################################################################
+    def genererCarte(self, path, topic):
+        if self._stopevent.isSet():
+            return
+        
+        vide = True
+
+        if not os.path.exists(path) or len(path) > 255:
+            return
+
+        dirs = os.listdir(path)
+        
+        for file in dirs:
+            
+            path_file = os.path.join(path, file)
+            info_file = path_file[len(self.frm.dossier):]
+            
+            if os.path.isdir(path_file):
+                evt = UpdateProgressEvent(augmenter = 0, info = u"Dossier en cours de traitement :\n\n"+info_file, message = None, modeStop = False)
+                wx.PostEvent(self.dlg, evt)
+                inclureD = getListNomGlob(path, self.frm.inclure_Dir)
+                exclureD = getListNomGlob(path, self.frm.exclure_Dir)
+                if not file in exclureD and file in inclureD:
+                    if len(os.listdir(path))>0:
+                        # mekk
+#                        t = topic.add_subtopic(file)
+                        
+                        # sdk
+                        t = TopicElement()
+                        t.setTitle(file)
+                        t.addMarker("Folder.png")
+
+                        dv = self.genererCarte(path_file, t)
+                        
+                        if EXCLURE_DOSSIERS_VIDE and not dv:
+                            topic.addSubTopic(t)
+                            vide = False
+#                    self.count += 1
+                    evt = UpdateProgressEvent(augmenter = fcount(path_file), info = None, message = None, modeStop = False)
+                    wx.PostEvent(self.dlg, evt)
+#                    self.dlg.Augmenter()
+                else:
+                    evt = UpdateProgressEvent(augmenter = fcount(path_file), info = None, message = None, modeStop = False)
+                    wx.PostEvent(self.dlg, evt)
+#                    self.dlg.Augmenter(fcount(path_file))
+#                    self.count += fcount(path_file)
+#                self.dlg.Augmenter()
+                
+                
+            else:
+                if self.fileOk(path, file):
+                    ext = os.path.splitext(file)[1]
+                    typ, nom = GetTypeNom(file)
+#                inclureF = getListNomGlob(path, self.frm.inclure_Fic)
+#                exclureF = getListNomGlob(path, self.frm.exclure_Fic)
+#                if not file in exclureF and file in inclureF and (typ in self.frm.inclure_Typ or typ == None):
+                    # mekk
+#                    t = topic.add_subtopic(GetNomSimple(file, typ))
+#                    t.set_link(os.path.join(path, file))
+#                    t.add_marker(TYPES[typ][1])
+                    
+                    # sdk
+                    t = TopicElement()
+                    if ext != "":
+                        tx = nom.split(ext)[0]
+                    else:
+                        tx = nom
+                    t.setTitle(tx)
+#                    t.setFileHyperlink(os.path.join(path, file)) # set a file hyperlink
+                    
+                    t.setFileHyperlink("file://" + utils.get_abs_path(os.path.join(path, file)))
+                    if typ != None:
+                        t.addMarker(TYPES[typ][1])
+                    
+                    topic.addSubTopic(t)
+
+                    vide = False
+        return vide
+    
+    
+    ##########################################################################################
+    def genererDossier(self, path, sortie):
+        if self._stopevent.isSet():
+            return
+        
+        vide = True
+        try:
+            sortie = unicode(sortie, DEFAUT_ENCODING)
+        except:
+            pass
+        
+        if not os.path.exists(path) or len(path) > 255:
+            return
+        
+        dirs = os.listdir(path)
+
+        for file in dirs:
+            path_file = os.path.join(path, file)
+            info_file = ".."+path_file[len(self.frm.dossier):]
+            if os.path.isdir(path_file):
+                evt = UpdateProgressEvent(augmenter = 0, info = u"Dossier en cours de traitement :\n\n"+info_file, message = None, modeStop = False)
+                wx.PostEvent(self.dlg, evt)
+                inclureD = getListNomGlob(path, self.frm.inclure_Dir)
+                exclureD = getListNomGlob(path, self.frm.exclure_Dir)
+                if not file in exclureD and file in inclureD:
+                    if len(os.listdir(path))>0:
+                        os.chdir(sortie)
+                        os.mkdir(file)
+                        dv = self.genererDossier(path_file, os.path.join(sortie, file))
+                        
+                        if EXCLURE_DOSSIERS_VIDE and not dv:
+                            vide = False
+                        else:
+                            os.chdir(sortie)
+                            os.rmdir(file)
+                    
+                    evt = UpdateProgressEvent(augmenter = 1, info = None, message = None, modeStop = False)
+                    wx.PostEvent(self.dlg, evt)
+                else:
+                    evt = UpdateProgressEvent(augmenter = fcount(path_file), info = None, message = None, modeStop = False)
+                    wx.PostEvent(self.dlg, evt)
+                        
+            else:
+                if self.fileOk(path, file):
+                    shutil.copy2(os.path.join(path, file), sortie)
+                    vide = False
+                    
+#                ext = os.path.splitext(file)[1]
+#                typ, nom = GetTypeNom(file)
+#                inclureF = getListNomGlob(path, self.frm.inclure_Fic)
+#                exclureF = getListNomGlob(path, self.frm.exclure_Fic)
+#                if not file in exclureF and file in inclureF \
+#                    and (not typ in self.frm.exclure_Typ and (typ in self.frm.inclure_Typ or len(self.frm.inclure_Typ) == 0)):
+#                    shutil.copy2(os.path.join(path, file), sortie)
+#                    vide = False
+        return vide
+    
+    
+     
+        
+    def run(self):
+        
+        #
+        # Carte mentale
+        #
+        if self.mode == 0:
+            wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
+            
+            nDossiers = fcount(self.frm.dossier)
+            self.dlg.SetMaxi(nDossiers)
+
+            evt = UpdateProgressEvent(augmenter = 0, info = None, message = u"Génération de la carte mentale ...\n\n", modeStop = False)
+            wx.PostEvent(self.dlg, evt)
+            
+            self.creerCarte(self.frm.nomFichier, self.frm.titreCarte, self.frm.dossier)
+            
+            wx.EndBusyCursor()
+            evt = UpdateProgressEvent(augmenter = 0, info = u"Fichier :\n" + self.frm.nomFichier, message = u"La carte mentale à été correctement générée\n\n",
+                                      modeStop = True)
+            wx.PostEvent(self.dlg, evt)
+            
+            self.frm.boutonOuvrirXMind.Enable(True)
+            
+        #
+        # Dossier clone
+        # 
+        else:
+        
+            wx.BeginBusyCursor(wx.HOURGLASS_CURSOR)
+            
+            nDossiers = fcount(self.frm.dossier)
+            self.dlg.SetMaxi(nDossiers) 
+                 
+            evt = UpdateProgressEvent(augmenter = 0, info = None, message = u"Génération du dossier clone ...\n\n", modeStop = False)
+            wx.PostEvent(self.dlg, evt)
+                    
+            self.genererDossier(self.frm.dossier, os.getcwd())
+            
+            if not self._stopevent.isSet():
+                if self.frm.ajouterCarteMentale:
+                    evt = UpdateProgressEvent(augmenter = 0, info = u"", message = u"Génération de la carte mentale ...\n\n", modeStop = False)
+                    wx.PostEvent(self.dlg, evt)
+                    self.creerCarte(os.path.join(self.frm.dossierSortie, self.frm.titreCarte, self.frm.titreCarte), self.frm.titreCarte, os.path.join(self.frm.dossierSortie, self.frm.titreCarte))
+                
+            wx.EndBusyCursor()
+            
+            evt = UpdateProgressEvent(augmenter = 0, info = u"Fichier :\n" + self.frm.dossier, message = u"Le dossier clone à été correctement générée\n\n",
+                                      modeStop = True)
+            wx.PostEvent(self.dlg, evt)
+
+    
+    
+    def stop(self): 
+        self._stopevent.set()
+        
+        
+        
+class ProgressFrame(wx.Frame):
     def __init__(
-            self, parent, ID, title, maxi, size=wx.DefaultSize, pos=wx.DefaultPosition, 
+            self, parent, ID, title, thread, size=wx.DefaultSize, pos=wx.DefaultPosition,
             style=wx.DEFAULT_DIALOG_STYLE,
             ):
-
-        # Instead of calling wx.Dialog.__init__ we precreate the dialog
-        # so we can set an extra style that must be set before
-        # creation, and then we create the GUI object using the Create
-        # method.
-        pre = wx.PreDialog()
-        pre.SetExtraStyle(wx.DIALOG_EX_CONTEXTHELP)
-        pre.Create(parent, ID, title, pos, size, style)
-
-        # This next step is the most important, it turns this Python
-        # object into the real wrapper of the dialog (instead of pre)
-        # as far as the wxPython extension is concerned.
-        self.PostCreate(pre)
-
-        # Now continue with the normal construction of the dialog
-        # contents
+        wx.Frame.__init__(self, None, ID, title, pos, size)
+        panel = wx.Panel(self, -1)
+        self.thread = thread
+        
+        self.Bind(EVT_UPDATE_PROGRESS, self.OnUpdate)
+        
         sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.label = wx.StaticText(self, -1, u"")
-        sizer.Add(self.label, 0, wx.ALIGN_CENTRE|wx.ALL|wx.EXPAND, 5)
+        self.label = wx.StaticText(panel, -1, u"\n")
+        
+        self.label.SetFont(FONT_ACTION)
+        sizer.Add(self.label, 0, wx.ALIGN_LEFT|wx.ALL|wx.EXPAND, 5)
+        
+        self.info = wx.StaticText(panel, -1, u"\n\n", style = wx.ST_ELLIPSIZE_START)
+        sizer.Add(self.info, 0, wx.ALIGN_LEFT|wx.ALL|wx.EXPAND, 5)
 
-        self.gauge = wx.Gauge(self, -1, maxi)
+        self.gauge = wx.Gauge(panel, -1, 1)
         sizer.Add(self.gauge, 0, wx.ALIGN_CENTRE|wx.ALL|wx.EXPAND, 5)
         self.count = 0
         
-        btnsizer = wx.StdDialogButtonSizer()
-        
-        if wx.Platform != "__WXMSW__":
-            btn = wx.ContextHelpButton(self)
-            btnsizer.AddButton(btn)
-        
-        btn = wx.Button(self, wx.ID_OK)
-#        btn.SetHelpText(u"")
-        btn.SetDefault()
-        btnsizer.AddButton(btn)
-        
-        btnsizer.Realize()
+        line = wx.StaticLine(panel, -1, size=(-1,-1), style=wx.LI_HORIZONTAL)
+        sizer.Add(line, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.TOP, 5)
 
-        sizer.Add(btnsizer, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+        self.btn = wx.Button(panel, -1, u"Annuler")
+        self.btn.SetHelpText(u"Annuler le traitement")
+        self.Bind(wx.EVT_BUTTON, self.OnClick, self.btn)
+        self.btn.SetDefault()
+#        btn.SetSize(btn.GetBestSize())
 
-        self.SetSizer(sizer)
-        sizer.Fit(self)
+        sizer.Add(self.btn, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5)
+
+        self.SetMinSize((250,120))
+        self.Layout()
+        panel.SetSizerAndFit(sizer)
+#        sizer.Fit(self)
 
 
     ##########################################################################################
+    def SetMaxi(self, maxi):
+        self.gauge.SetRange(maxi)
+        
+        
+    ##########################################################################################
+    def OnUpdate(self, evt):
+        self.Augmenter(evt.augmenter)
+        if evt.info != None:
+            self.SetInfo(evt.info)
+        if evt.message != None:
+            self.SetMessage(evt.message)
+        if evt.modeStop:
+            self.btn.SetLabel(u"Terminé")
+        
+    ##########################################################################################
+    def OnClick(self, event):
+        if self.btn.GetLabel()[0] == "T":
+            self.Destroy()
+        else:
+            self.thread.stop()
+        
+    ##########################################################################################
     def Augmenter(self, n = 1):
         self.count += n
+#        print self.count
         self.gauge.SetValue(self.count)
         self.Update()
         self.Refresh()
 
     ##########################################################################################
     def SetMessage(self, t):
-        self.label.SetLabel(t)
+#        print t
+        self.label.SetLabelText(t)
         self.Update()
         self.Layout()
         self.Refresh()
         
-        
+    ##########################################################################################
+    def SetInfo(self, t):
+#        print t
+        if t != u"":
+            self.info.SetLabel(t)
+        else:
+            self.info.SetLabel(u"")
+#        self.Fit()
+#        self.Update()
+#        self.Layout()
+#        self.Refresh()
+
+
+
+
+def onerror(func, path, exc_info):
+    """
+    Error handler for ``shutil.rmtree``.
+
+    If the error is due to an access error (read only file)
+    it attempts to add write permission and then retries.
+
+    If the error is for another reason it re-raises the error.
+
+    Usage : ``shutil.rmtree(path, onerror=onerror)``
+    """
+    import stat
+    if not os.access(path, os.W_OK):
+        # Is the error an access error ?
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
+    
+     
 #############################################################################################################
 def messageErreur(parent, titre, message):
     dlg = wx.MessageDialog(parent, message, titre,
@@ -1146,6 +1507,11 @@ if __name__ == '__main__':
         
     
     app = wx.App()
+    
+    FONT_IE = wx.Font(10, wx.SWISS, wx.NORMAL, wx.FONTWEIGHT_BOLD)
+    FONT_ACTION = wx.Font(11, wx.SWISS, wx.NORMAL, wx.FONTWEIGHT_BOLD)
+    FONT_ITALIC = wx.Font(10, wx.SWISS, wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL)
+
     app.frame = pyXorgFrame()
     app.frame.Show()
     app.MainLoop()

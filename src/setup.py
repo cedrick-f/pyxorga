@@ -3,8 +3,8 @@
 
 ##################################################################################################
 #
-#    Script pour g�n�rer un pack avec executable :
-#    c:\python26\python setup.py build
+#    Script pour générer un pack avec executable :
+#    c:\python27\python setup.py build
 #
 ##################################################################################################
 
