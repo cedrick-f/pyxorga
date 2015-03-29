@@ -37,7 +37,7 @@ Copyright (C) 2014
 """
 __appname__= "pyXorga"
 __author__ = u"Cédrick FAURY"
-__version__ = "1.3"
+__version__ = "1.4"
 
 
 ####################################################################################
@@ -124,6 +124,11 @@ def toDefautEncoding(path):
     path = path.encode(DEFAUT_ENCODING)
     return path  
 
+######################################################################################  
+def toFileEncoding(path): 
+    path = path.decode(DEFAUT_ENCODING)
+    path = path.encode(FILE_ENCODING)
+    return path  
 
 def utf8decode(s):
     s = s.encode("iso-8859-1")
@@ -225,7 +230,7 @@ SECTION_FILTRE = u"Filtres"
 def fcount(path):
     count1 = 0
     for root, dirs, files in os.walk(path):
-            count1 += len(dirs)
+        count1 += len(dirs)
 
     return count1
 
@@ -806,7 +811,10 @@ class pyXorgFrame(wx.Frame):
         if not os.path.isfile(FICHIER_CFG):
             return
         config = ConfigParser.ConfigParser()
-        config.read(FICHIER_CFG)
+#        config.read(FICHIER_CFG)
+        
+        config.readfp(codecs.open(FICHIER_CFG, "r", "utf8"))
+        
         self.dossier = config.get(SECTION_FICH, "Dossier", u"")
         self.dossierSortie = config.get(SECTION_FICH, "DossierSortie", u"")
         self.nomFichier = config.get(SECTION_FICH, "Fichier", u"")
@@ -960,7 +968,7 @@ class URLSelectorCombo(wx.Panel):
                 self.marquerErreur(lien + u" n'est pas un dossier valide !")
                 self.lien = u""
         else:
-            self.texte.ChangeValue(toDefautEncoding(lien))
+            self.texte.ChangeValue(lien)
             self.lien = lien
             
         self.app.OnPathModified(self, self.lien)
@@ -1207,8 +1215,10 @@ class ThreadDossier(threading.Thread):
                         # sdk
                         t = TopicElement()
                         t.setTitle(file)
-                        t.addMarker("Folder.png")
-
+                        #t.addMarker("Folder.png")
+                        
+                        t.setFileHyperlink("file://" + utils.get_abs_path(os.path.join(path, file)))
+                        
                         dv = self.genererCarte(path_file, t)
                         
                         if EXCLURE_DOSSIERS_VIDE and not dv:
