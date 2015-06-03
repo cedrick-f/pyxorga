@@ -1,7 +1,7 @@
 #pyXorga
-
+[images/pyXorga_logo2_500x500.png]
 pyXorga permet, à partir d’un dossier de fichiers, de générer son arborescence sous la forme :
- * d’une carte mentale Xmind, avec les liens vers les fichiers
+ * d’une carte mentale [Xmind](https://www.xmind.net/), avec les liens vers les fichiers
  * d’un clone partiel du dossier
 
 Dans les deux cas, l’arborescence du dossier est filtrée ; pyXorga permet d’inclure/exclure :
