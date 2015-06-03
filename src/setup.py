@@ -11,6 +11,7 @@
 import sys, os
 from glob import glob
 from cx_Freeze import setup, Executable
+from version import *
 
 #reload(sys)
 #sys.setdefaultencoding('utf-8')
@@ -22,8 +23,10 @@ shutil.rmtree("build", ignore_errors=True)
 # Inculsion des fichiers de donn�es
 #################################################################################################
 includefiles = [('D:/Developpement/Microsoft.VC90.CRT', "Microsoft.VC90.CRT"),
-                     'gpl.txt', 
+                     'LICENSE.txt', 
                      'Types.cfg',
+#                     'pyXorga_icone.ico',
+#                     ('../images', 'images')
                      ]
 
 # Dependencies are automatically detected, but it might need fine tuning.
@@ -52,7 +55,7 @@ cible = Executable(
     script = "pyXorga.py",
     base = base,
     compress = True,
-#    icon = os.path.join("", 'logo.ico'),
+    icon = os.path.join("", 'pyXorga_icone.ico'),
     initScript = None,
     copyDependentFiles = True,
     appendScriptToExe = False,
@@ -61,7 +64,7 @@ cible = Executable(
 
 
 setup(  name = "pyXorga",
-        version = "1.4",
+        version = GetVersion_cxFreeze(),
         author = "Cedrick FAURY",
         description = u"pyXorga",
         options = {"build_exe": build_exe_options},
