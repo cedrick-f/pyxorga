@@ -25,7 +25,7 @@ shutil.rmtree("build", ignore_errors=True)
 includefiles = [('D:/Developpement/Microsoft.VC90.CRT', "Microsoft.VC90.CRT"),
                      'LICENSE.txt', 
                      'Types.cfg',
-#                     'pyXorga_icone.ico',
+                     'pyXorga_icone.ico',
 #                     ('../images', 'images')
                      ]
 

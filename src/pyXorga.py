@@ -340,13 +340,12 @@ class FilterNB(wx.Notebook):
         
 class pyXorgFrame(wx.Frame):
     def __init__(self, nomFichier = None):
-        wx.Frame.__init__(self, None, -1, "pyXorga", size = (400,600))
+        wx.Frame.__init__(self, None, -1, "pyXorga" + version.__version__, size = (400,600))
         p = wx.Panel(self, -1, style = wx.TAB_TRAVERSAL
                      | wx.CLIP_CHILDREN
                      | wx.FULL_REPAINT_ON_RESIZE
                      )
 
-        
         self.SetIcon(wx.Icon(os.path.join(PATH, r"pyXorga_icone.ico"), wx.BITMAP_TYPE_ICO))
         
         self.exclure_Dir = EXCLURE_DIR

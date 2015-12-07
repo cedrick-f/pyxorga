@@ -17,14 +17,22 @@
 ;along with pyXorga; if not, write to the Free Software
 ;Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+[ISPP]
+#define AppName "pyXorga"
+#define AppVersion "2.1"
+#define AppVersionInfo "2.1.0"
+#define AppVersionBase "2"
+
+#define AppURL "https://github.com/cedrick-f/pyXorga"
+
 [Setup]
 ;Informations générales sur l'application
-AppName=pyXorga 2.0
-AppVerName=pyXorga 2.0
-AppVersion=2.0
+AppName={#AppName}
+AppVerName={#AppName} {#AppVersion}
+AppVersion={#AppVersion}
 AppPublisher=Cédrick FAURY
 AppCopyright=Copyright (C) 2015 Cédrick FAURY <fauryc@free.fr>
-VersionInfoVersion = 2.0.0.0
+VersionInfoVersion = {#AppVersionInfo}
 
 ;Répertoire de base contenant les fichiers
 SourceDir=D:\Developpement\pyXorga
@@ -43,7 +51,7 @@ SolidCompression=yes
 PrivilegesRequired=none
 
 ;Nom du fichier généré et répertoire de destination
-OutputBaseFilename=pyXorga_2.0_setup
+OutputBaseFilename=pyXorga_{#AppVersion}_setup
 OutputDir=releases
 
 ;Dans le panneau de configuration de Windows2000/NT/XP, c'est l'icone de pymecavideo.exe qui
@@ -63,7 +71,7 @@ AlwaysUsePersonalGroup=no
 Name: fr; MessagesFile: "compiler:Languages\French.isl"
 
 [Messages]
-BeveledLabel=pyXorga 2.0 installation
+BeveledLabel=pyXorga {#AppVersion} installation
 
 
 [CustomMessages]
@@ -107,12 +115,12 @@ Name: common; Description: {cm:AllUsers}; GroupDescription: {cm:InstallFor}; Fla
 Name: local;  Description: {cm:JustMe}; GroupDescription: {cm:InstallFor}; Flags: exclusive unchecked
 
 [Icons]
-Name: {group}\pyXorga;Filename: {app}\bin\pyXorga.exe; WorkingDir: {app}\bin; IconFileName: {app}\bin\pyXorga.exe
-Name: {group}\{cm:uninstall} pyXorga; Filename: {app}\unins000.exe;IconFileName: {app}\unins000.exe
+Name: {group}\{#AppName};Filename: {app}\bin\pyXorga.exe; WorkingDir: {app}\bin; IconFileName: {app}\bin\pyXorga.exe
+Name: {group}\{cm:uninstall} {#AppName}; Filename: {app}\unins000.exe;IconFileName: {app}\unins000.exe
 ;
 ; On ajoute sur le Bureau l'icône pyXorga
 ;
-Name: {code:DefDesktop}\pyXorga 2;   Filename: {app}\bin\pyXorga.exe; WorkingDir: {app}\bin; MinVersion: 4,4; Tasks: desktopicon2; IconFileName: {app}\bin\pyXorga.exe
+Name: {code:DefDesktop}\{#AppName} {#AppVersionBase};   Filename: {app}\bin\pyXorga.exe; WorkingDir: {app}\bin; MinVersion: 4,4; Tasks: desktopicon2; IconFileName: {app}\bin\pyXorga.exe
 
 
 [_ISTool]
@@ -127,9 +135,9 @@ Use7zip=true
 ;Root: HKCR; Subkey: {cm:FileExtensionName}\DefaultIcon; ValueType: string; ValueData: {app}\data\icones\pymecavideo.ico,0; Flags: uninsdeletekey;
 
 ; Pour stocker le style d'installation : "All users" ou "Current user"
-Root: HKLM; Subkey: Software\pyXorga; Flags: uninsdeletekey;
-Root: HKLM; Subkey: Software\pyXorga; ValueType: string; ValueName: DataFolder; ValueData: {code:DefAppDataFolder}\pyXorga ; Flags: uninsdeletekey;
-Root: HKLM; Subkey: Software\pyXorga; ValueName: "UninstallPath" ; ValueType: string; ValueData: {uninstallexe}; Flags: uninsdeletekey;
+Root: HKLM; Subkey: Software\{#AppName}; Flags: uninsdeletekey;
+Root: HKLM; Subkey: Software\{#AppName}; ValueType: string; ValueName: DataFolder; ValueData: {code:DefAppDataFolder}\{#AppName} ; Flags: uninsdeletekey;
+Root: HKLM; Subkey: Software\{#AppName}; ValueType: string; ValueName: UninstallPath; ValueData: {uninstallexe}; Flags: uninsdeletekey;
 
 
 ; Ajout d'une commande au menu contextuel

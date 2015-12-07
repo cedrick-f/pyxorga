@@ -35,19 +35,22 @@ Copyright (C) 2015
 #import _winreg
 import os, sys
 
-if sys.platform == 'win32':
-    #
-    # Les deuxlignes suivantes permettent de lancer le script pymecavideo.py depuis n'importe
-    # quel répertoire  sans que l'utilisation de chemins
-    # relatifs ne soit perturbée
-    #
-    PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
-    #PATH = os.path.split(PATH)[0]
-    os.chdir(PATH)
-    sys.path.append(PATH)
-
+if hasattr(sys, 'setdefaultencoding'):
+    sys.setdefaultencoding('utf8')
 else:
-    pass
+    reload(sys)  # Reload does the trick!
+    sys.setdefaultencoding('utf-8')
+
+#
+# Les deuxlignes suivantes permettent de lancer le script pymecavideo.py depuis n'importe
+# quel répertoire  sans que l'utilisation de chemins
+# relatifs ne soit perturbée
+#
+PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+#PATH = os.path.split(PATH)[0]
+os.chdir(PATH)
+sys.path.append(PATH)
+
 
 
 #
@@ -56,34 +59,37 @@ else:
 if sys.platform == 'win32':
     #On récupèreﾠ le dossier "Application data" 
     #On lit la clef de registre indiquant le type d'installation
-    import win32api, win32con
+    import _winreg
 
     try:
         # Vérifie si pyXorga est installé
-        regkey = win32api.RegOpenKeyEx(win32con.HKEY_LOCAL_MACHINE, 'SOFTWARE\\pyXorga', 0, win32con.KEY_READ)
-        (value, keytype) = win32api.RegQueryValueEx(regkey, 'DataFolder')
+        regkey = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\pyXorga')
+        (value, keytype) = _winreg.QueryValueEx(regkey, 'DataFolder')
         APP_DATA_PATH = value
-        
+        print "***", APP_DATA_PATH
         # pyXorga installé : on récupère le dossier d'installation
         try:
-            regkey = win32api.RegOpenKeyEx(win32con.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\pyXorga 1.0_is1', 0, win32con.KEY_READ)
-            (value, keytype) = win32api.RegQueryValueEx(regkey, 'Inno Setup: App Path')
+            regkey = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\pyXorga 1.0_is1')
+            (value, keytype) = _winreg.QueryValueEx(regkey, 'Inno Setup: App Path')
             INSTALL_PATH = value
         except:
             try:
-                regkey = win32api.RegOpenKeyEx(win32con.HKEY_LOCAL_MACHINE, 'SOFTWARE\\pyXorga', 0, win32con.KEY_READ)
-                (value, keytype) = win32api.RegQueryValueEx(regkey, 'UninstallPath')
+                regkey = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\\pyXorga')
+                (value, keytype) = _winreg.QueryValueEx(regkey, 'UninstallPath')
                 INSTALL_PATH = value
             except:
                 print u"install_path non trouvé"
+        
+        INSTALL_PATH = os.path.join(os.path.split(INSTALL_PATH)[0], 'bin')
         print u"pyXorga installé dans", INSTALL_PATH
         print u"pyXorga démarré dans", PATH
         
-        if INSTALL_PATH == os.path.split(PATH)[0]:
+        if INSTALL_PATH == PATH:
             # On est bien en train d'éxécuter la version "installée"
             if not os.path.exists(APP_DATA_PATH):
                 os.makedirs(APP_DATA_PATH)
         else:
+            INSTALL_PATH = None
             print u"Version PORTABLE", PATH
         
         
@@ -94,16 +100,33 @@ if sys.platform == 'win32':
 
 
 else:
-    print os.getenv('APPDATA')
+ 
+    
+    INSTALL_PATH = None
     import subprocess
-    datalocation = os.path.join(QStandardPaths.standardLocations(QStandardPaths.DataLocation)[0], "data", "pymecavideo")
-    PATH = APP_DATA_PATH = datalocation
-    if not os.path.exists(datalocation):
-        subprocess.call("mkdir -p %s" %datalocation, shell=True)
+    #import standardpaths
+    #import version
+    
+    #standardpaths.configure(application_name="pySequence", organization_name=version.__author__)
+    #datalocation = standardpaths.Location.app_local_data.value
+    
+    #datalocation = standardpaths.get_writable_path('app_local_data')
+    #datalocation = standardpaths.get_writable_path(standardpaths.Location.app_local_data)
+    
+    
+    datalocation = os.getenv('APPDATA')
+    if datalocation != None:
+        datalocation = os.path.join(datalocation, "pyXorga")
+        if not os.path.exists(datalocation):
+            subprocess.call("mkdir -p %s" %datalocation, shell=True)
+        APP_DATA_PATH = datalocation
+    else:
+        APP_DATA_PATH = PATH
+        
         
 
 # execution du pyXorga "installé"
-if INSTALL_PATH is not None and INSTALL_PATH == os.path.split(PATH)[0]:
+if INSTALL_PATH is not None and INSTALL_PATH == PATH:
     APP_DATA_PATH_USER = os.path.join(os.getenv('APPDATA'), 'pyXorga')
     if not os.path.isdir(APP_DATA_PATH_USER):
         os.mkdir(APP_DATA_PATH_USER)
