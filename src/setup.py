@@ -22,7 +22,7 @@ shutil.rmtree("build", ignore_errors=True)
 
 # Inculsion des fichiers de donn�es
 #################################################################################################
-includefiles = [('D:/Developpement/Microsoft.VC90.CRT', "Microsoft.VC90.CRT"),
+includefiles = [('C:\Users\Cedrick\Documents\Developp\Microsoft.VC90.CRT', "Microsoft.VC90.CRT"),
                      'LICENSE.txt', 
                      'Types.cfg',
                      'pyXorga_icone.ico',
