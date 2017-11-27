@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+# from __future__ import unicode_literals
 
 ##This file is part of pyXorga
 #############################################################################
@@ -31,7 +31,7 @@ from __future__ import unicode_literals
 pyXorga.py
 Organiser ses fichiers à l'aide de Xmind
 *************
-Copyright (C) 2014 - 2015
+Copyright (C) 2014 - 2016
 @author: Cedrick FAURY
 
 """
@@ -46,6 +46,8 @@ import version
 ####################################################################################
 # GUI wxpython
 import wx
+
+from util_path import *
 
 # sdk
 import xmind
@@ -70,46 +72,24 @@ import codecs
 print "defaultencoding", sys.getdefaultencoding()
 print "stdin, stdout", sys.stdin.encoding,sys.stdout.encoding
 
-if hasattr(sys, 'setdefaultencoding'):
-    sys.setdefaultencoding('utf8')
-else:
-    reload(sys)  # Reload does the trick!
-    sys.setdefaultencoding('utf-8')
+# if hasattr(sys, 'setdefaultencoding'):
+#     sys.setdefaultencoding('utf8')
+# else:
+#     reload(sys)  # Reload does the trick!
+#     sys.setdefaultencoding('utf-8')
 
-FILE_ENCODING = sys.getfilesystemencoding() #'cp1252'#
 
-SYSTEM_ENCODING = sys.getdefaultencoding()#sys.stdout.encoding#
-print "FILE_ENCODING", FILE_ENCODING
-print "SYSTEM_ENCODING", SYSTEM_ENCODING
-   
-######################################################################################  
-def toSystemEncoding(path): 
-#        try:
-    path = path.decode(FILE_ENCODING)
-    path = path.encode(SYSTEM_ENCODING)
-    return path  
-#        except:
-#            return self.path    
-    
-######################################################################################  
-def toFileEncoding(path):
-#    try:
-    path = path.decode(SYSTEM_ENCODING)
-    return path.encode(FILE_ENCODING)
-#    except:
-#        return path
 
-from util_path import *
 
 
 # Fichiers CFG "originaux"
-FICHIER_TYPES_ORG = os.path.join(PATH, toFileEncoding("Types.cfg"))
+FICHIER_TYPES_ORG = os.path.join(PATH, toFileEncoding(u"Types.cfg"))
 
 # Fichiers CFG("commun" ou bien "utilisateur" selon le choix fait à l'installation)
-FICHIER_TYPES = os.path.join(APP_DATA_PATH, toFileEncoding("Types.cfg"))
+FICHIER_TYPES = os.path.join(APP_DATA_PATH, toFileEncoding(u"Types.cfg"))
 
 ## Fichiers CFG "utilisateurs"
-FICHIER_CFG_USER = os.path.join(APP_DATA_PATH_USER, toFileEncoding("pyXorga.cfg"))
+FICHIER_CFG_USER = os.path.join(APP_DATA_PATH_USER, toFileEncoding(u"pyXorga.cfg"))
 #FICHIER_TYPES_USER = os.path.join(APP_DATA_PATH_USER, toFileEncoding("Types.cfg"))
 
 
@@ -141,9 +121,9 @@ MarqueurDossier.setMarkerId(MARQUEUR_DOSSIER)
 
 
 
-def utf8decode(s):
-    s = s.encode("iso-8859-1")
-    return s.decode("utf-8")
+# def utf8decode(s):
+#     s = s.encode("iso-8859-1")
+#     return s.decode("utf-8")
 
 
 def listdirectory2(path):  
@@ -165,7 +145,7 @@ def GetTypeNom(nFich):
     if len(parties) > 1:
         for t in TYPES.keys():
             if parties[0] == t:
-                return t, parties[1]
+                return t, SEPARATEUR.join(parties[1:])
     return None, nFich
 
 
@@ -292,7 +272,7 @@ class FilterNB(wx.Notebook):
                              )
 
         self.winDossiers = PanelInclureExclure(self, app, "D", inclure_Dir, exclure_Dir)
-        self.AddPage(self.winDossiers, "Dossiers")
+        self.AddPage(self.winDossiers, u"Dossiers")
 #        self.exclure_D = winDossiers.exclure
 #        self.inclure_D = winDossiers.inclure
 
@@ -340,13 +320,13 @@ class FilterNB(wx.Notebook):
         
 class pyXorgFrame(wx.Frame):
     def __init__(self, nomFichier = None):
-        wx.Frame.__init__(self, None, -1, "pyXorga" + version.__version__, size = (400,600))
+        wx.Frame.__init__(self, None, -1, u"pyXorga" + version.__version__, size = (400,600))
         p = wx.Panel(self, -1, style = wx.TAB_TRAVERSAL
                      | wx.CLIP_CHILDREN
                      | wx.FULL_REPAINT_ON_RESIZE
                      )
 
-        self.SetIcon(wx.Icon(os.path.join(PATH, r"pyXorga_icone.ico"), wx.BITMAP_TYPE_ICO))
+        self.SetIcon(wx.Icon(os.path.join(PATH, u"pyXorga_icone.ico"), wx.BITMAP_TYPE_ICO))
         
         self.exclure_Dir = EXCLURE_DIR
         self.inclure_Dir = INCLURE_DIR
@@ -575,8 +555,8 @@ class pyXorgFrame(wx.Frame):
         #####################################################################################################################
         elif event.GetEventObject() == self.boutonGenererXMind:
             
-            if os.path.splitext(self.nomFichier)[1].lower() != ".xmind":
-                self.nomFichier = os.path.splitext(self.nomFichier)[0] + ".xmind"
+            if os.path.splitext(self.nomFichier)[1].lower() != u".xmind":
+                self.nomFichier = os.path.splitext(self.nomFichier)[0] + u".xmind"
                 
             if os.path.exists(self.nomFichier):
                 dlg = wx.MessageDialog(self, u"La carte mentale %s existe déja !\n\n" \
@@ -1323,8 +1303,8 @@ class ThreadDossier(threading.Thread):
     ##########################################################################################
     def creerCarte(self, nomFichier, titreCarte, dossier):
         # Version sdk
-        if os.path.splitext(nomFichier)[1] != ".xmind":
-            nomFichier = os.path.splitext(nomFichier)[0] + toSystemEncoding(".xmind")
+        if os.path.splitext(nomFichier)[1] != u".xmind":
+            nomFichier = os.path.splitext(nomFichier)[0] + toSystemEncoding(u".xmind")
         xm = xmind.load(nomFichier)
         first_sheet = xm.getPrimarySheet() # get the first sheet
         first_sheet.setTitle(titreCarte) # set its title
@@ -1405,7 +1385,7 @@ class ThreadDossier(threading.Thread):
                         t.setTitle(toSystemEncoding(file))
                         #t.addMarker("Folder.png")
                         
-                        t.setFileHyperlink("file://" + toSystemEncoding(utils.get_abs_path(os.path.join(path, file))))
+                        t.setFileHyperlink(u"file://" + toSystemEncoding(utils.get_abs_path(os.path.join(path, file))))
                         
                         dv = self.genererCarte(path_file, t)
                         
@@ -1444,7 +1424,7 @@ class ThreadDossier(threading.Thread):
                         tx = nom
                     t.setTitle(tx)
                     
-                    t.setFileHyperlink("file://" + toSystemEncoding(utils.get_abs_path(os.path.join(path, file))))
+                    t.setFileHyperlink(u"file://" + toSystemEncoding(utils.get_abs_path(os.path.join(path, file))))
                     if typ != None:
                         t.addMarker(TYPES[typ][1])
                     

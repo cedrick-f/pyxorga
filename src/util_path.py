@@ -41,12 +41,19 @@ else:
     reload(sys)  # Reload does the trick!
     sys.setdefaultencoding('utf-8')
 
+
+FILE_ENCODING = sys.getfilesystemencoding() #'cp1252'#
+SYSTEM_ENCODING = sys.getdefaultencoding()#sys.stdout.encoding#
+print "FILE_ENCODING", FILE_ENCODING
+print "SYSTEM_ENCODING", SYSTEM_ENCODING
+   
+
 #
 # Les deuxlignes suivantes permettent de lancer le script pymecavideo.py depuis n'importe
 # quel répertoire  sans que l'utilisation de chemins
 # relatifs ne soit perturbée
 #
-PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
+PATH = os.path.dirname(os.path.abspath(sys.argv[0])).decode(FILE_ENCODING)
 #PATH = os.path.split(PATH)[0]
 os.chdir(PATH)
 sys.path.append(PATH)
@@ -144,4 +151,24 @@ print u"Dossier COMMUN pour les données :", APP_DATA_PATH
 print u"Dossier USER pour les données :", APP_DATA_PATH_USER
 
 
+
+
+######################################################################################  
+def toSystemEncoding(path): 
+#     return path
+#        try:
+#     path = path.decode(FILE_ENCODING)
+#     path = path.encode(SYSTEM_ENCODING)
+    return path  
+#        except:
+#            return self.path    
+    
+######################################################################################  
+def toFileEncoding(path):
+#     return path
+#    try:
+    path = path.decode(SYSTEM_ENCODING)
+    return path.encode(FILE_ENCODING)
+#    except:
+#        return path
 #print "programdata", os.environ['ALLUSERSPROFILE']

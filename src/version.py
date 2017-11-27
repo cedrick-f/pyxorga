@@ -40,7 +40,7 @@ import wx
 
 __appname__= "pyXorga"
 __author__ = u"Cédrick FAURY"
-__version__ = "2.1"
+__version__ = "2.2"
 print __version__
 
 
