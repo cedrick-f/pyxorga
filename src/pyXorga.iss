@@ -19,8 +19,8 @@
 
 [ISPP]
 #define AppName "pyXorga"
-#define AppVersion "2.1"
-#define AppVersionInfo "2.1.0"
+#define AppVersion "2.2"
+#define AppVersionInfo "2.2.0"
 #define AppVersionBase "2"
 
 #define AppURL "https://github.com/cedrick-f/pyXorga"
@@ -31,11 +31,11 @@ AppName={#AppName}
 AppVerName={#AppName} {#AppVersion}
 AppVersion={#AppVersion}
 AppPublisher=Cédrick FAURY
-AppCopyright=Copyright (C) 2015 Cédrick FAURY <fauryc@free.fr>
+AppCopyright=Copyright (C) 2017 Cédrick FAURY
 VersionInfoVersion = {#AppVersionInfo}
 
 ;Répertoire de base contenant les fichiers
-SourceDir=D:\Developpement\pyXorga
+SourceDir=C:\Users\Cedrick\Documents\Developp\pyXorga
 
 ;Repertoire d'installation
 DefaultDirName={pf}\pyXorga
@@ -151,7 +151,7 @@ Procedure URLLabelOnClick(Sender: TObject);
 var
   ErrorCode: Integer;
 begin
-  ShellExec('open', 'http://fauryc.free.fr/', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+  ShellExec('open', 'https://github.com/cedrick-f/pyxorga', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
 end;
 
 {*** INITIALISATION ***}
@@ -160,7 +160,7 @@ var
   URLLabel: TNewStaticText;
 begin
   URLLabel := TNewStaticText.Create(WizardForm);
-  URLLabel.Caption := 'S.I.I. applications';
+  URLLabel.Caption := 'pyXorga sur GitHub';
   URLLabel.Cursor := crHand;
   URLLabel.OnClick := @URLLabelOnClick;
   URLLabel.Parent := WizardForm;
